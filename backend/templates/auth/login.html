@@ -1,0 +1,119 @@
+{% extends 'base_auth.html' %}
+{% block title %}登录 - 龙猫图书{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { 
+        background-image: url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1920&q=80'); 
+        background-size: cover;
+        background-position: center;
+    }
+    .login-container {
+        backdrop-filter: blur(8px);
+        background: rgba(255, 255, 255, 0.85);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="login-container w-full max-w-4xl grid md:grid-cols-2 rounded-3xl shadow-2xl overflow-hidden">
+        <!-- Left Side: Welcome -->
+        <div class="hidden md:flex flex-col justify-center p-12 bg-indigo-600 text-white">
+            <h1 class="text-4xl font-bold mb-6 italic">Welcome Back</h1>
+            <p class="text-indigo-100 mb-8 leading-relaxed">
+                龙猫图书管理系统为您提供最便捷的阅读体验。探索知识的海洋，从这里开始。
+            </p>
+            <div class="space-y-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <span>海量图书资源</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <span>便捷借还流程</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Form -->
+        <div class="p-8 md:p-12">
+            <div class="text-center mb-8">
+                <h2 class="text-2xl font-bold text-slate-800">登 录</h2>
+                <p class="text-slate-500 mt-2">请选择您的身份并输入凭据</p>
+            </div>
+
+            <!-- Identity Tabs -->
+            <div class="flex p-1 bg-slate-100 rounded-xl mb-8">
+                <button onclick="setRole('reader')" id="role-reader" class="flex-1 py-2 text-sm font-medium rounded-lg transition-all bg-white shadow-sm text-indigo-600">普通读者</button>
+                <button onclick="setRole('admin')" id="role-admin" class="flex-1 py-2 text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-700">管理员</button>
+            </div>
+
+            <form method="post" action="{% url 'login' %}" class="space-y-6">
+                {% csrf_token %}
+                <input type="hidden" name="role" id="input-role" value="reader">
+                
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-slate-700 ml-1">用户名</label>
+                    <div class="relative">
+                        <i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="username" required class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="输入您的用户名">
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm font-semibold text-slate-700 ml-1">密码</label>
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="password" name="password" required class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="输入您的密码">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-sm">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 text-slate-600">记住我</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95">
+                    立即登录
+                </button>
+            </form>
+
+            <div class="mt-8 text-center text-sm">
+                <span class="text-slate-500">没有账号？</span>
+                <a href="{% url 'register' %}" class="text-indigo-600 font-bold hover:underline">免费注册</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function setRole(role) {
+        document.getElementById('input-role').value = role;
+        const btnReader = document.getElementById('role-reader');
+        const btnAdmin = document.getElementById('role-admin');
+        
+        if(role === 'admin') {
+            btnAdmin.classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+            btnAdmin.classList.remove('text-slate-500');
+            btnReader.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600');
+            btnReader.classList.add('text-slate-500');
+        } else {
+            btnReader.classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+            btnReader.classList.remove('text-slate-500');
+            btnAdmin.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600');
+            btnAdmin.classList.add('text-slate-500');
+        }
+    }
+</script>
+{% endblock %}

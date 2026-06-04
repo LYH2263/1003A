@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}首页 - 龙猫图书{% endblock %}
+{% block page_title %}系统预览{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="relative rounded-3xl overflow-hidden bg-indigo-600 text-white mb-10 shadow-2xl shadow-indigo-200">
+    <div class="absolute inset-0 opacity-20">
+        <img src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200" class="w-full h-full object-cover">
+    </div>
+    <div class="relative p-8 md:p-14 md:flex items-center justify-between">
+        <div class="max-w-2xl">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">探索无限知识的疆界</h1>
+            <p class="text-indigo-100 text-lg mb-8">龙猫图书借阅系统，为您提供最现代、最高效的图书管理方案。随时随地，开启您的阅读时光。</p>
+            <div class="flex space-x-4">
+                <a href="{% url 'book_browse' %}" class="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-lg active:scale-95">开始浏览</a>
+                <a href="#announcements" class="bg-indigo-500/50 backdrop-blur-sm px-6 py-3 rounded-xl font-bold text-white hover:bg-indigo-500 transition-all border border-white/20">查看公告</a>
+            </div>
+        </div>
+        <div class="hidden lg:block">
+            <div class="relative animate-float">
+                <i class="fas fa-book-reader text-[120px] text-white/90"></i>
+                <div class="absolute -top-4 -right-4 w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white text-xl">
+                    <i class="fas fa-sparkles"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-10">
+    <!-- Left: Latest Books -->
+    <div class="lg:col-span-2 space-y-8">
+        <div class="flex items-center justify-between">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center">
+                <i class="fas fa-fire text-red-500 mr-3"></i>
+                最新上架
+            </h3>
+            <a href="{% url 'book_browse' %}" class="text-primary font-medium hover:underline text-sm">查看全部 <i class="fas fa-chevron-right ml-1"></i></a>
+        </div>
+        
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+            {% for book in latest_books %}
+            <div class="group bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all card-hover border border-slate-100">
+                <div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 bg-slate-100">
+                    {% if book.cover %}
+                        <img src="{{ book.cover.url }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                    {% else %}
+                        <div class="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                            <i class="fas fa-book text-3xl mb-2"></i>
+                            <span class="text-xs">暂无封面</span>
+                        </div>
+                    {% endif %}
+                </div>
+                <h4 class="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors">{{ book.title }}</h4>
+                <p class="text-xs text-slate-500 mt-1">{{ book.author }}</p>
+                <div class="mt-4 flex items-center justify-between">
+                    <span class="text-xs font-semibold px-2 py-1 bg-slate-50 text-slate-600 rounded-md">{{ book.category.name }}</span>
+                    <a href="{% url 'book_detail' book.pk %}" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-primary hover:text-white transition-all">
+                        <i class="fas fa-arrow-right text-xs"></i>
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+                <p class="col-span-full text-center text-slate-400 py-10">暂无图书上架</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Right: Announcements -->
+    <div class="space-y-8" id="announcements">
+        <h3 class="text-2xl font-bold text-slate-800 flex items-center">
+            <i class="fas fa-bullhorn text-accent mr-3"></i>
+            系统公告
+        </h3>
+        
+        <div class="space-y-4">
+            {% for announcement in announcements %}
+            <div class="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:bg-slate-50 transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-primary bg-indigo-50 px-2 py-1 rounded-md">公告</span>
+                    <span class="text-xs text-slate-400">{{ announcement.created_at|date:"Y-m-d" }}</span>
+                </div>
+                <h5 class="font-bold text-slate-800 mb-2">{{ announcement.title }}</h5>
+                <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">{{ announcement.content }}</p>
+            </div>
+            {% empty %}
+            <div class="p-8 text-center bg-white rounded-2xl border border-slate-100">
+                <i class="fas fa-comment-slash text-slate-200 text-4xl mb-4"></i>
+                <p class="text-slate-400 text-sm">暂无最新公告</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    .animate-float { animation: float 3s ease-in-out infinite; }
+</style>
+{% endblock %}

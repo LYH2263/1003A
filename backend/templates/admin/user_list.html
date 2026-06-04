@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}用户管理 - 龙猫图书{% endblock %}
+{% block page_title %}会员管理中心{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-800">注册用户列表</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-4">用户</th>
+                    <th class="px-6 py-4">角色</th>
+                    <th class="px-6 py-4">电话</th>
+                    <th class="px-6 py-4">加入时间</th>
+                    <th class="px-6 py-4">状态</th>
+                    <th class="px-6 py-4 text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for user in users %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                            {{ user.username|first|upper }}
+                        </div>
+                        <span class="font-bold text-slate-700">{{ user.username }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if user.role == 'admin' %}
+                            <span class="px-2 py-1 bg-purple-50 text-purple-600 rounded-md text-xs font-bold border border-purple-100">管理员</span>
+                        {% else %}
+                            <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-md text-xs font-bold">读者</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-500">{{ user.phone|default:"-" }}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">{{ user.date_joined|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4">
+                        {% if user.is_active %}
+                            <div class="flex items-center text-emerald-500 text-xs font-bold">
+                                <span class="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span> 活跃
+                            </div>
+                        {% else %}
+                            <div class="flex items-center text-slate-400 text-xs font-bold">
+                                <span class="w-2 h-2 bg-slate-300 rounded-full mr-2"></span> 禁用
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center space-x-2">
+                        <!-- Edit Button (Triggers Modal) -->
+                        <button onclick="openEditModal('{{ user.pk }}', '{{ user.username }}', '{{ user.phone|default:'' }}', '{{ user.role }}')" class="p-2 text-slate-400 hover:text-primary transition-colors" title="编辑">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        
+                        <!-- Toggle Status Button -->
+                        {% if not user.is_superuser %}
+                        <form action="{% url 'user_toggle_status' user.pk %}" method="post" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="p-2 text-slate-400 hover:text-orange-500 transition-colors" title="{% if user.is_active %}禁用账户{% else %}启用账户{% endif %}">
+                                <i class="fas {% if user.is_active %}fa-lock{% else %}fa-lock-open{% endif %}"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 transform scale-95 transition-transform duration-300" id="editUserModalContent">
+        <h3 class="text-xl font-bold text-slate-800 mb-6">编辑用户</h3>
+        <form id="editUserForm" method="post" action="">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">用户名</label>
+                    <input type="text" id="modalUsername" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed" disabled>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">角色</label>
+                    <select name="role" id="modalRole" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none">
+                        <option value="reader">读者</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">联系电话</label>
+                    <input type="text" name="phone" id="modalPhone" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none">
+                </div>
+            </div>
+            <div class="mt-8 flex space-x-4">
+                <button type="button" onclick="closeEditModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">取消</button>
+                <button type="submit" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">保存更改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditModal(pk, username, phone, role) {
+        const modal = document.getElementById('editUserModal');
+        const modalContent = document.getElementById('editUserModalContent');
+        const form = document.getElementById('editUserForm');
+        
+        // Populate fields
+        document.getElementById('modalUsername').value = username;
+        document.getElementById('modalPhone').value = phone;
+        document.getElementById('modalRole').value = role;
+        
+        // Set Action URL directly
+        form.action = `/users/${pk}/edit/`;
+        
+        modal.classList.remove('hidden');
+        // Small delay to allow display flow to update, then animate opacity
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+            modalContent.classList.add('scale-100');
+        }, 10);
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById('editUserModal');
+        const modalContent = document.getElementById('editUserModalContent');
+        
+        modal.classList.add('opacity-0');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+        
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+</script>
+{% endblock %}

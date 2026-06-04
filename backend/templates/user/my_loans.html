@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}我的借阅 - 龙猫图书{% endblock %}
+{% block page_title %}我的借阅清单{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+    {% for loan in loans %}
+    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex gap-6 group hover:shadow-xl transition-all">
+        <div class="w-24 shrink-0 aspect-[3/4] rounded-xl overflow-hidden bg-slate-100">
+            {% if loan.book.cover %}
+                <img src="{{ loan.book.cover.url }}" class="w-full h-full object-cover">
+            {% else %}
+                <div class="w-full h-full flex items-center justify-center text-slate-300">
+                    <i class="fas fa-book"></i>
+                </div>
+            {% endif %}
+        </div>
+        <div class="flex-1 flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="px-2 py-1 text-[10px] font-bold rounded-md 
+                        {% if loan.status == 'borrowed' %}bg-emerald-50 text-emerald-600
+                        {% elif loan.status == 'pending' %}bg-orange-50 text-orange-600
+                        {% else %}bg-slate-50 text-slate-500{% endif %}">
+                        {{ loan.get_status_display }}
+                    </span>
+                    <span class="text-[10px] text-slate-400">{{ loan.borrow_date|date:"Y/m/d" }}</span>
+                </div>
+                <h4 class="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors">{{ loan.book.title }}</h4>
+                <p class="text-xs text-slate-500 mt-1">需在 {{ loan.due_date|date:"Y-m-d" }} 前归还</p>
+            </div>
+            
+            {% if loan.status == 'borrowed' %}
+            <div class="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400">距离还书还剩 {{ loan.due_date|timeuntil }}</span>
+                <i class="fas fa-clock text-indigo-200"></i>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+        <div class="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-300">
+            <i class="fas fa-ghost text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800">书架空空如也</h3>
+        <p class="text-slate-500 mt-2">快去探索您感兴趣的图书吧</p>
+        <a href="{% url 'book_browse' %}" class="inline-block mt-8 px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-100 hover:scale-105 transition-all">发现好书</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

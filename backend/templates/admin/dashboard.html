@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% block title %}管理员后台 - 龙猫图书{% endblock %}
+{% block page_title %}管理概览{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-book"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">图书总数</p>
+            <h4 class="text-2xl font-bold text-slate-900">{{ stats.total_books }}</h4>
+        </div>
+    </div>
+    
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-users"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">注册用户</p>
+            <h4 class="text-2xl font-bold text-slate-900">{{ stats.total_users }}</h4>
+        </div>
+    </div>
+    
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-hand-holding-heart"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">借出中</p>
+            <h4 class="text-2xl font-bold text-slate-900">{{ stats.active_loans }}</h4>
+        </div>
+    </div>
+    
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4 animate-pulse">
+        <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-bell"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">待审批</p>
+            <h4 class="text-2xl font-bold text-slate-900">{{ stats.pending_requests }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-10">
+    <!-- Main Column (Chart + Recent Activity) -->
+    <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Borrowing Trends Chart -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-6 animate-fade-in-up">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg">借阅趋势分析</h3>
+                    <p class="text-xs text-slate-500 mt-1">系统借阅与归还活动情况</p>
+                </div>
+                <div class="flex space-x-2 bg-slate-50 p-1 rounded-xl">
+                    <button id="btn-this-week" class="chart-btn px-4 py-1.5 text-xs font-bold bg-white text-indigo-600 rounded-lg shadow-sm transition-all duration-200">本周</button>
+                    <button id="btn-this-month" class="chart-btn px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg transition-all duration-200">本月</button>
+                </div>
+            </div>
+            <div class="h-64 sm:h-80 w-full relative">
+                <canvas id="borrowTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 class="font-bold text-slate-800">最新借阅记录</h3>
+                <a href="{% url 'loan_manage' %}" class="text-xs font-bold text-primary px-3 py-1 bg-indigo-50 rounded-full">查看全部</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4">读者</th>
+                            <th class="px-6 py-4">图书</th>
+                            <th class="px-6 py-4">日期</th>
+                            <th class="px-6 py-4 text-center">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 italic">
+                        {% for loan in recent_loans %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ loan.user.username }}</td>
+                            <td class="px-6 py-4 text-sm text-slate-600 line-clamp-1 mt-3">{{ loan.book.title }}</td>
+                            <td class="px-6 py-4 text-xs text-slate-400">{{ loan.borrow_date|date:"Y-m-d" }}</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="px-2 py-1 text-[10px] font-bold rounded-full 
+                                    {% if loan.status == 'borrowed' %}bg-emerald-100 text-emerald-700
+                                    {% elif loan.status == 'pending' %}bg-orange-100 text-orange-700
+                                    {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                    {{ loan.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-10 text-center text-slate-300 text-sm">暂无借阅动态</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="space-y-6">
+        <div class="bg-indigo-900 rounded-3xl p-8 text-white shadow-xl">
+            <h3 class="text-xl font-bold mb-6">快捷操作</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <a href="{% url 'book_manage' %}" class="aspect-square bg-white/10 rounded-2xl flex flex-col items-center justify-center hover:bg-white hover:text-indigo-900 transition-all group">
+                    <i class="fas fa-plus-circle text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold">新增图书</span>
+                </a>
+                <a href="{% url 'loan_manage' %}" class="aspect-square bg-white/10 rounded-2xl flex flex-col items-center justify-center hover:bg-white hover:text-indigo-900 transition-all group">
+                    <i class="fas fa-clipboard-check text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold">审核中心</span>
+                </a>
+                <a href="{% url 'user_manage' %}" class="aspect-square bg-white/10 rounded-2xl flex flex-col items-center justify-center hover:bg-white hover:text-indigo-900 transition-all group">
+                    <i class="fas fa-user-plus text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold">会员核对</span>
+                </a>
+                
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 rounded-3xl p-6 text-white overflow-hidden relative">
+            <div class="absolute -right-4 -bottom-4 opacity-10">
+                <i class="fas fa-chart-pie text-8xl"></i>
+            </div>
+            <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">活跃度提示</p>
+            <p class="text-sm font-light leading-relaxed">本周系统处理了 <span class="text-indigo-400 font-bold">24</span> 笔借阅请求，比上周提升了 12%。继续保持！</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', async function() {
+        const ctx = document.getElementById('borrowTrendChart').getContext('2d');
+        
+        // Setup gradient for the area under the line
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)'); // Indigo-600 with 20% opacity
+        gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');   // Transparent
+        
+        let weeklyData = { labels: [], data: [] };
+        let monthlyData = { labels: [], data: [] };
+        let chart;
+
+        try {
+            const response = await fetch("{% url 'dashboard_chart_data' %}");
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            
+            weeklyData = data.weekly;
+            monthlyData = data.monthly;
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weeklyData.labels,
+                    datasets: [{
+                        label: '借阅活动',
+                        data: weeklyData.data,
+                        borderColor: '#4f46e5', // tailwind indigo-600
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#4f46e5',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.4 // Smooth curves
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false // Hide default legend
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e293b', // tailwind slate-800
+                            padding: 12,
+                            titleFont: { size: 13, family: 'Inter, sans-serif' },
+                            bodyFont: { size: 14, family: 'Inter, sans-serif', weight: 'bold' },
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y + ' 次借出/借入';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#94a3b8', // tailwind slate-400
+                                font: { family: 'Inter, sans-serif', size: 12 }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: '#f1f5f9', // tailwind slate-100
+                                drawBorder: false,
+                                borderDash: [5, 5]
+                            },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { family: 'Inter, sans-serif', size: 12 },
+                                padding: 10,
+                                stepSize: 10
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+
+            // Button interaction logic
+            const btnThisWeek = document.getElementById('btn-this-week');
+            const btnThisMonth = document.getElementById('btn-this-month');
+
+            function setActiveButton(activeBtn, inactiveBtn) {
+                activeBtn.classList.remove('font-medium', 'text-slate-500', 'hover:text-slate-700', 'bg-transparent');
+                activeBtn.classList.add('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
+                
+                inactiveBtn.classList.remove('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
+                inactiveBtn.classList.add('font-medium', 'text-slate-500', 'hover:text-slate-700');
+            }
+
+            btnThisWeek.addEventListener('click', () => {
+                setActiveButton(btnThisWeek, btnThisMonth);
+                chart.data.labels = weeklyData.labels;
+                chart.data.datasets[0].data = weeklyData.data;
+                chart.update();
+            });
+
+            btnThisMonth.addEventListener('click', () => {
+                setActiveButton(btnThisMonth, btnThisWeek);
+                chart.data.labels = monthlyData.labels;
+                chart.data.datasets[0].data = monthlyData.data;
+                chart.update();
+            });
+            
+        } catch (error) {
+            console.error('Failed to fetch chart data:', error);
+            // Fallback or error state could be handled here
+        }
+    });
+</script>
+{% endblock %}

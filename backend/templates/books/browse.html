@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}浏览图书 - 龙猫图书{% endblock %}
+{% block page_title %}图书发现{% endblock %}
+
+{% block content %}
+<div class="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div class="flex items-center space-x-3 overflow-x-auto pb-2 -mb-2 no-scrollbar">
+        <a href="?" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if not request.GET.category %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">全部</a>
+        {% for cat in categories %}
+        <a href="?category={{ cat.id }}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if request.GET.category == cat.id|stringformat:'s' %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">{{ cat.name }}</a>
+        {% endfor %}
+    </div>
+    
+    <form class="relative w-full md:w-80">
+        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input type="text" name="q" value="{{ query }}" placeholder="查找灵感..." class="w-full pl-11 pr-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all">
+    </form>
+</div>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+    {% for book in books %}
+    <a href="{% url 'book_detail' book.pk %}" class="bg-white rounded-3xl p-5 shadow-sm hover:shadow-2xl transition-all card-hover border border-slate-50 group">
+        <div class="aspect-[3/4] rounded-2xl overflow-hidden mb-5 bg-slate-50 relative">
+            {% if book.cover %}
+                <img src="{{ book.cover.url }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+            {% else %}
+                <div class="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                    <i class="fas fa-book text-4xl mb-3"></i>
+                </div>
+            {% endif %}
+            <div class="absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur-md rounded-lg text-[10px] font-black text-slate-800 uppercase tracking-tighter">
+                {{ book.category.name }}
+            </div>
+        </div>
+        <h4 class="font-black text-slate-900 leading-tight mb-2 line-clamp-1 italic">{{ book.title }}</h4>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-400 font-medium">{{ book.author }}</span>
+            <div class="flex items-center space-x-1">
+                <div class="w-1.5 h-1.5 rounded-full {% if book.stock > 0 %}bg-emerald-500 animate-pulse{% else %}bg-slate-300{% endif %}"></div>
+                <span class="text-[10px] font-bold text-slate-400">{% if book.stock > 0 %}有货{% else %}借罄{% endif %}</span>
+            </div>
+        </div>
+    </a>
+    {% empty %}
+    <div class="col-span-full py-20 text-center">
+        <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="fas fa-search text-slate-300 text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800">未找到匹配结果</h3>
+        <p class="text-slate-500 mt-2">尝试更换关键词或查看其它分类</p>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}系统设置 - 龙猫图书{% endblock %}
+{% block page_title %}系统配置与公告{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-8">
+    <!-- Basic Config -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 h-fit">
+        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+            <i class="fas fa-sliders-h mr-3 text-primary"></i> 基础配置
+        </h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_config">
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">系统名称</label>
+                    <input type="text" name="site_title" value="{{ config.site_title }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                </div>
+                
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div>
+                        <span class="block text-sm font-bold text-slate-800">维护模式</span>
+                        <span class="text-xs text-slate-500">开启后仅管理员可访问后台</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="maintenance_mode" {% if config.maintenance_mode %}checked{% endif %} class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                
+                <button type="submit" class="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                    保存配置
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Announcements -->
+    <div class="space-y-8">
+        <!-- New Announcement -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                <i class="fas fa-bullhorn mr-3 text-orange-400"></i> 发布新公告
+            </h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_announcement">
+                <div class="space-y-4">
+                    <input type="text" name="title" placeholder="公告标题" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none">
+                    <textarea name="content" rows="3" placeholder="公告内容..." required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none"></textarea>
+                    <div class="flex justify-end">
+                        <button type="submit" class="px-6 py-2 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 transition-colors">发布</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- List -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+             <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="text-sm font-bold text-slate-500 uppercase">历史公告</h3>
+            </div>
+            <div class="divide-y divide-slate-100">
+                {% for item in announcements %}
+                <div class="p-6 hover:bg-slate-50 transition-colors group">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-slate-800">{{ item.title }}</h4>
+                        <button onclick="uiConfirm('删除公告', '确定删除此条公告吗？', ()=>document.getElementById('del-{{ item.id }}').submit())" class="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <p class="text-sm text-slate-500 line-clamp-2">{{ item.content }}</p>
+                    <div class="mt-2 text-xs text-slate-400 flex items-center">
+                        <i class="far fa-clock mr-1"></i> {{ item.created_at|date:"Y-m-d H:i" }}
+                    </div>
+                    <form id="del-{{ item.id }}" action="{% url 'announcement_delete' item.id %}" method="post" class="hidden">{% csrf_token %}</form>
+                </div>
+                {% empty %}
+                <div class="p-8 text-center text-slate-400 text-sm">暂无发布记录</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

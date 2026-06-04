@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} - 龙猫图书{% endblock %}
+{% block page_title %}图书详情{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white rounded-[40px] shadow-2xl shadow-slate-100 overflow-hidden md:flex p-10 md:p-16 gap-16 border border-slate-50">
+        <!-- Left: Poster -->
+        <div class="w-full md:w-80 shrink-0">
+            <div class="aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl shadow-indigo-100 ring-8 ring-slate-50 relative group">
+                {% if book.cover %}
+                    <img src="{{ book.cover.url }}" class="w-full h-full object-cover">
+                {% else %}
+                    <div class="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                        <i class="fas fa-book text-6xl"></i>
+                    </div>
+                {% endif %}
+                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+            </div>
+        </div>
+
+        <!-- Right: Info -->
+        <div class="flex-1 mt-10 md:mt-0 space-y-8">
+            <div class="space-y-4">
+                <div class="flex items-center space-x-3">
+                    <span class="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-lg">{{ book.category.name }}</span>
+                    <span class="text-xs text-slate-400 font-mono">ISBN: {{ book.isbn }}</span>
+                </div>
+                <h1 class="text-4xl font-extrabold text-slate-900 leading-tight italic">{{ book.title }}</h1>
+                <p class="text-xl text-slate-500 font-medium">作者: {{ book.author }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 pb-8 border-b border-slate-100">
+                <div class="bg-slate-50 p-4 rounded-2xl">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">当前存量</p>
+                    <p class="text-2xl font-black text-slate-800">{{ book.stock }} <span class="text-xs font-normal text-slate-400">/ {{ book.total_stock }}</span></p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">借阅周期</p>
+                    <p class="text-2xl font-black text-slate-800">30 <span class="text-xs font-normal text-slate-400">天</span></p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="font-bold text-slate-800 text-lg">图书简介</h3>
+                <p class="text-slate-600 leading-relaxed font-light">{{ book.description|default:"作者很懒，暂未提供简介..." }}</p>
+            </div>
+
+            <div class="pt-6 flex flex-col sm:flex-row gap-4">
+                {% if book.stock > 0 %}
+                    <a href="{% url 'borrow_request' book.pk %}" class="flex-1 py-4 bg-indigo-600 text-white text-center font-bold rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all hover:scale-[1.02] active:scale-95">
+                        <i class="fas fa-hand-holding-heart mr-2"></i> 立即申请借阅
+                    </a>
+                {% else %}
+                    <button class="flex-1 py-4 bg-slate-200 text-slate-500 font-bold rounded-2xl cursor-not-allowed">
+                        <i class="fas fa-times-circle mr-2"></i> 库存不足
+                    </button>
+                {% endif %}
+                <button onclick="history.back()" class="px-8 py-4 border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all">
+                    返回列表
+                </button>
+            </div>
+            
+            <p class="text-center md:text-left text-xs text-slate-400 flex items-center justify-center md:justify-start">
+                <i class="fas fa-shield-alt mr-2 text-indigo-300"></i>
+                文明借阅，爱护图书，逾期请及时归还
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
