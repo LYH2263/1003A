@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     # Local Apps
     'apps.users.apps.UsersConfig',
     'apps.books.apps.BooksConfig',
+    'apps.forum.apps.ForumConfig',
 ]
 
 MIDDLEWARE = [

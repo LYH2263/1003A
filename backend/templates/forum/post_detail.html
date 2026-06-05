@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ post.title }} - 读书论坛{% endblock %}
+{% block page_title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'category_detail' post.category.id %}" class="text-primary hover:text-secondary transition-colors">
+        <i class="fas fa-arrow-left mr-2"></i>返回{{ post.category.name }}
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+    <div class="p-6 border-b border-slate-200">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                    {% if post.is_pinned %}
+                    <span class="px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">置顶</span>
+                    {% endif %}
+                    <h1 class="text-xl font-bold text-slate-800">{{ post.title }}</h1>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-slate-500">
+                    <span><i class="fas fa-user mr-1"></i>{{ post.author.username }}</span>
+                    <span><i class="fas fa-eye mr-1"></i>{{ post.views }}</span>
+                    <span><i class="fas fa-clock mr-1"></i>{{ post.created_at|date:'Y-m-d H:i' }}</span>
+                </div>
+            </div>
+            {% if user.role == 'admin' %}
+            <div class="flex items-center gap-2">
+                <form action="{% url 'toggle_pin_post' post.id %}" method="post" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="px-3 py-1 text-sm {% if post.is_pinned %}bg-slate-200 text-slate-600{% else %}bg-amber-100 text-amber-600{% endif %} rounded-lg hover:opacity-80 transition-opacity">
+                        <i class="fas fa-thumbtack mr-1"></i>
+                        {% if post.is_pinned %}取消置顶{% else %}置顶{% endif %}
+                    </button>
+                </form>
+                <form action="{% url 'delete_post' post.id %}" method="post" class="inline" onsubmit="return confirm('确定要删除这个帖子吗？');">
+                    {% csrf_token %}
+                    <button type="submit" class="px-3 py-1 text-sm bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors">
+                        <i class="fas fa-trash mr-1"></i>删除
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="p-6">
+        {% if post.book %}
+        <div class="flex items-start gap-4 mb-6 p-4 bg-slate-50 rounded-xl">
+            {% if post.book.cover %}
+            <img src="{{ post.book.cover.url }}" alt="{{ post.book.title }}" class="w-16 h-24 object-cover rounded-lg shadow-sm">
+            {% endif %}
+            <div>
+                <div class="text-sm text-slate-500 mb-1">关联图书</div>
+                <div class="font-semibold text-slate-800">{{ post.book.title }}</div>
+                <div class="text-sm text-slate-500">{{ post.book.author }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="prose max-w-none text-slate-700 whitespace-pre-wrap">{{ post.content }}</div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-6 border-b border-slate-200">
+        <h3 class="text-lg font-semibold text-slate-800">回复列表 ({{ replies.paginator.count }})</h3>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+        {% for reply in replies %}
+        <div class="p-6" id="reply-{{ reply.id }}">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
+                    {{ reply.author.username|first|upper }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="font-semibold text-slate-800">{{ reply.author.username }}</span>
+                            <span class="text-sm text-slate-400">#{{ reply_floor_offset|add:forloop.counter }}楼</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-slate-400">{{ reply.created_at|date:'Y-m-d H:i' }}</span>
+                            {% if user.is_authenticated %}
+                            <button onclick="quoteReply({{ reply.id }}, '{{ reply.author.username }}', '{{ reply.content|escapejs|truncatechars:100 }}')" class="text-sm text-primary hover:text-secondary transition-colors">
+                                <i class="fas fa-reply mr-1"></i>引用
+                            </button>
+                            {% endif %}
+                            {% if user.role == 'admin' %}
+                            <form action="{% url 'delete_reply' reply.id %}" method="post" class="inline" onsubmit="return confirm('确定要删除这条回复吗？');">
+                                {% csrf_token %}
+                                <button type="submit" class="text-sm text-red-500 hover:text-red-600 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if reply.parent_reply %}
+                    <div class="mt-2 p-3 bg-slate-50 rounded-lg border-l-4 border-primary">
+                        <div class="text-sm text-slate-500 mb-1">
+                            引用 @{{ reply.parent_reply.author.username }} 的回复：
+                        </div>
+                        <div class="text-slate-600 text-sm">{{ reply.parent_reply.content|truncatechars:200 }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3 text-slate-700 whitespace-pre-wrap">{{ reply.content }}</div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="p-12 text-center text-slate-500">
+            <i class="fas fa-comment text-4xl mb-4 text-slate-300"></i>
+            <p>暂无回复，快来抢沙发吧！</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if replies.has_other_pages %}
+    <div class="p-6 border-t border-slate-200">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-slate-500">
+                共 {{ replies.paginator.count }} 条回复，第 {{ replies.number }} / {{ replies.paginator.num_pages }} 页
+            </div>
+            <div class="flex items-center gap-2">
+                {% if replies.has_previous %}
+                <a href="?page={{ replies.previous_page_number }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+                
+                {% for page_num in replies.paginator.page_range %}
+                {% if page_num == replies.number %}
+                <span class="px-3 py-1 rounded-lg bg-primary text-white">{{ page_num }}</span>
+                {% elif page_num > replies.number|add:'-3' and page_num < replies.number|add:'3' %}
+                <a href="?page={{ page_num }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">{{ page_num }}</a>
+                {% endif %}
+                {% endfor %}
+                
+                {% if replies.has_next %}
+                <a href="?page={{ replies.next_page_number }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if user.is_authenticated %}
+<div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-6 border-b border-slate-200">
+        <h3 class="text-lg font-semibold text-slate-800">发表回复</h3>
+    </div>
+    <form action="{% url 'create_reply' post.id %}" method="post" class="p-6">
+        {% csrf_token %}
+        <input type="hidden" name="parent_reply" id="parent_reply_id" value="">
+        
+        <div id="quote_preview" class="hidden mb-4 p-3 bg-slate-50 rounded-lg border-l-4 border-primary">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-sm text-slate-500">引用 <span id="quote_author"></span> 的回复：</span>
+                <button type="button" onclick="cancelQuote()" class="text-sm text-red-500 hover:text-red-600">
+                    <i class="fas fa-times"></i> 取消引用
+                </button>
+            </div>
+            <div class="text-slate-600 text-sm" id="quote_content"></div>
+        </div>
+        
+        <textarea name="content" rows="5" placeholder="写下你的回复..." required
+            class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"></textarea>
+        
+        <div class="mt-4 flex justify-end">
+            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-xl hover:bg-secondary transition-colors">
+                <i class="fas fa-paper-plane mr-2"></i>发布回复
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<script>
+function quoteReply(replyId, author, content) {
+    document.getElementById('parent_reply_id').value = replyId;
+    document.getElementById('quote_author').textContent = '@' + author;
+    document.getElementById('quote_content').textContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+    document.getElementById('quote_preview').classList.remove('hidden');
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function cancelQuote() {
+    document.getElementById('parent_reply_id').value = '';
+    document.getElementById('quote_preview').classList.add('hidden');
+}
+</script>
+{% endblock %}

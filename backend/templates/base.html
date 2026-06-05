@@ -90,6 +90,10 @@
                         <i class="fas fa-heart w-6"></i>
                         <span>我的书单</span>
                     </a>
+                    <a href="{% url 'forum_home' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name in 'forum_home,category_detail,post_detail,create_post' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
+                        <i class="fas fa-comments w-6"></i>
+                        <span>读书论坛</span>
+                    </a>
                     <a href="{% url 'profile' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'profile' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
                         <i class="fas fa-user-circle w-6"></i>
                         <span>个人资料</span>

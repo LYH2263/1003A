@@ -9,6 +9,7 @@ django.setup()
 
 from apps.users.models import User
 from apps.books.models import Book, Category, LoanRecord, Announcement
+from apps.forum.models import ForumCategory
 
 def seed():
     print("开始填充演示数据...")
@@ -73,6 +74,21 @@ def seed():
     for title, content in announcements:
         Announcement.objects.get_or_create(title=title, defaults={'content': content})
     print("- 系统公告已更新")
+
+    # 4.5 创建论坛板块
+    forum_categories = [
+        ('读书心得', '分享你的阅读感悟和心得体会', 1),
+        ('图书推荐', '推荐你喜欢的好书，发现更多精彩', 2),
+        ('书评讨论', '深度讨论书籍内容，交流不同观点', 3),
+        ('作者交流', '讨论作家作品风格和创作背景', 4),
+        ('求助问答', '有问题来这里提问，书友们帮你解答', 5),
+    ]
+    for name, desc, weight in forum_categories:
+        ForumCategory.objects.get_or_create(
+            name=name,
+            defaults={'description': desc, 'sort_weight': weight}
+        )
+    print(f"- 已创建 {len(forum_categories)} 个论坛板块")
 
     # 5. 创建演示借阅记录
     if not LoanRecord.objects.exists():

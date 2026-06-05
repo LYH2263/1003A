@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ category.name }} - 读书论坛{% endblock %}
+{% block page_title %}{{ category.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'forum_home' %}" class="text-primary hover:text-secondary transition-colors">
+        <i class="fas fa-arrow-left mr-2"></i>返回论坛首页
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-800">{{ category.name }}</h3>
+            <p class="text-sm text-slate-500 mt-1">{{ category.description|default:'暂无描述' }}</p>
+        </div>
+        {% if user.is_authenticated %}
+        <a href="{% url 'create_post' category.id %}" class="px-4 py-2 bg-primary text-white rounded-xl hover:bg-secondary transition-colors">
+            <i class="fas fa-plus mr-2"></i>发布新帖
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="divide-y divide-slate-100">
+        {% for post in posts %}
+        <div class="p-6 hover:bg-slate-50 transition-colors {% if post.is_pinned %}bg-amber-50{% endif %}">
+            <div class="flex items-start gap-4">
+                {% if post.book and post.book.cover %}
+                <img src="{{ post.book.cover.url }}" alt="{{ post.book.title }}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                {% endif %}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        {% if post.is_pinned %}
+                        <span class="px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">置顶</span>
+                        {% endif %}
+                        <a href="{% url 'post_detail' post.id %}" class="text-lg font-semibold text-slate-800 hover:text-primary transition-colors truncate">
+                            {{ post.title }}
+                        </a>
+                    </div>
+                    {% if post.book %}
+                    <div class="text-sm text-slate-500 mt-1">
+                        <i class="fas fa-book mr-1"></i>关联图书：《{{ post.book.title }}》
+                    </div>
+                    {% endif %}
+                    <div class="flex items-center gap-6 mt-3 text-sm text-slate-500">
+                        <span><i class="fas fa-user mr-1"></i>{{ post.author.username }}</span>
+                        <span><i class="fas fa-eye mr-1"></i>{{ post.views }}</span>
+                        <span><i class="fas fa-comment mr-1"></i>{{ post.reply_count }}</span>
+                        <span><i class="fas fa-clock mr-1"></i>{{ post.created_at|date:'Y-m-d H:i' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="p-12 text-center text-slate-500">
+            <i class="fas fa-file-alt text-4xl mb-4 text-slate-300"></i>
+            <p>该板块暂无帖子</p>
+            {% if user.is_authenticated %}
+            <a href="{% url 'create_post' category.id %}" class="inline-block mt-4 px-4 py-2 bg-primary text-white rounded-xl hover:bg-secondary transition-colors">
+                <i class="fas fa-plus mr-2"></i>发布第一篇帖子
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if posts.has_other_pages %}
+    <div class="p-6 border-t border-slate-200">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-slate-500">
+                共 {{ posts.paginator.count }} 条记录，第 {{ posts.number }} / {{ posts.paginator.num_pages }} 页
+            </div>
+            <div class="flex items-center gap-2">
+                {% if posts.has_previous %}
+                <a href="?page={{ posts.previous_page_number }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+                
+                {% for page_num in posts.paginator.page_range %}
+                {% if page_num == posts.number %}
+                <span class="px-3 py-1 rounded-lg bg-primary text-white">{{ page_num }}</span>
+                {% elif page_num > posts.number|add:'-3' and page_num < posts.number|add:'3' %}
+                <a href="?page={{ page_num }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">{{ page_num }}</a>
+                {% endif %}
+                {% endfor %}
+                
+                {% if posts.has_next %}
+                <a href="?page={{ posts.next_page_number }}" class="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
