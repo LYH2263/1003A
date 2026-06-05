@@ -30,6 +30,7 @@ urlpatterns = [
     
     # Loan Management
     path('my-loans/', views.my_loans, name='my_loans'),
+    path('loans/<int:pk>/renew/', views.renew_loan, name='renew_loan'),
     path('users/manage/', views.user_manage, name='user_manage'),
     path('loans/manage/', views.loan_manage, name='loan_manage'),
     path('loans/<int:pk>/audit/<str:action>/', views.audit_loan, name='audit_loan'),

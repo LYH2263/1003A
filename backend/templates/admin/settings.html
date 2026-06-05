@@ -3,55 +3,267 @@
 {% block page_title %}系统配置与公告{% endblock %}
 
 {% block content %}
-<div class="grid lg:grid-cols-2 gap-8">
-    <!-- Basic Config -->
-    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 h-fit">
-        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
-            <i class="fas fa-sliders-h mr-3 text-primary"></i> 基础配置
-        </h3>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_config">
-            <div class="space-y-6">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">系统名称</label>
-                    <input type="text" name="site_title" value="{{ config.site_title }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
-                </div>
-                
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+<div class="space-y-8">
+    <!-- First Row: Basic Config & Borrow Rules -->
+    <div class="grid lg:grid-cols-2 gap-8">
+        <!-- Basic Config -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 h-fit">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                <i class="fas fa-sliders-h mr-3 text-primary"></i> 基础配置
+            </h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_config">
+                <div class="space-y-6">
                     <div>
-                        <span class="block text-sm font-bold text-slate-800">维护模式</span>
-                        <span class="text-xs text-slate-500">开启后仅管理员可访问后台</span>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">系统名称</label>
+                        <input type="text" name="site_title" value="{{ config.site_title }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="maintenance_mode" {% if config.maintenance_mode %}checked{% endif %} class="sr-only peer">
-                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                </div>
-                
-                <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div class="flex items-center justify-between mb-2">
+                    
+                    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <div>
-                            <span class="block text-sm font-bold text-slate-800">每日罚款单价</span>
-                            <span class="text-xs text-slate-500">修改后仅对新产生的逾期生效</span>
+                            <span class="block text-sm font-bold text-slate-800">维护模式</span>
+                            <span class="text-xs text-slate-500">开启后仅管理员可访问后台</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="maintenance_mode" {% if config.maintenance_mode %}checked{% endif %} class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <span class="block text-sm font-bold text-slate-800">每日罚款单价</span>
+                                <span class="text-xs text-slate-500">修改后仅对新产生的逾期生效</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-slate-500">¥</span>
+                            <input type="number" name="daily_fine_rate" value="{{ config.daily_fine_rate }}" step="0.1" min="0" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-slate-700 text-sm">
+                            <span class="text-sm text-slate-500">/ 天</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-slate-500">¥</span>
-                        <input type="number" name="daily_fine_rate" value="{{ config.daily_fine_rate }}" step="0.1" min="0" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-slate-700 text-sm">
-                        <span class="text-sm text-slate-500">/ 天</span>
-                    </div>
+                    
+                    <button type="submit" class="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                        保存配置
+                    </button>
                 </div>
-                
-                <button type="submit" class="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">
-                    保存配置
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
+
+        <!-- Create Borrow Rule -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 h-fit">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                <i class="fas fa-plus-circle mr-3 text-emerald-500"></i> 创建借阅规则
+            </h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_borrow_rule">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">规则名称</label>
+                        <input type="text" name="name" placeholder="例如：夏季借阅规则" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大借阅天数</label>
+                            <input type="number" name="max_borrow_days" value="30" min="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">续借天数</label>
+                            <input type="number" name="renew_days" value="15" min="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大同时借阅数</label>
+                            <input type="number" name="max_borrow_quantity" value="0" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                            <span class="text-xs text-slate-400">0表示无限制</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">每日最大申请次数</label>
+                            <input type="number" name="max_daily_requests" value="0" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                            <span class="text-xs text-slate-400">0表示无限制</span>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-sm font-bold text-slate-800">允许续借</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="allow_renew" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大续借次数</label>
+                            <input type="number" name="max_renew_count" value="1" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <div>
+                            <span class="block text-sm font-bold text-emerald-800">设为启用规则</span>
+                            <span class="text-xs text-emerald-600">启用后将作为当前生效规则</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="is_active" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                        创建规则
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <!-- Announcements & Credit Logs -->
-    <div class="space-y-8">
+    <!-- Borrow Rules List -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center">
+                <i class="fas fa-list-alt mr-3 text-indigo-500"></i> 借阅规则列表
+            </h3>
+        </div>
+        <div class="p-6">
+            {% if borrow_rules %}
+            <div class="space-y-4">
+                {% for rule in borrow_rules %}
+                <div class="p-4 border rounded-xl {% if rule.is_active %}border-emerald-200 bg-emerald-50/50{% else %}border-slate-200 bg-slate-50/30{% endif %}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h4 class="font-bold text-slate-800">{{ rule.name }}</h4>
+                                {% if rule.is_active %}
+                                <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">当前启用</span>
+                                {% endif %}
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600">
+                                <span><i class="fas fa-calendar-day mr-1 text-slate-400"></i> 借期: {{ rule.max_borrow_days }}天</span>
+                                <span><i class="fas fa-books mr-1 text-slate-400"></i> 限借: {% if rule.max_borrow_quantity > 0 %}{{ rule.max_borrow_quantity }}本{% else %}无限制{% endif %}</span>
+                                <span><i class="fas fa-redo mr-1 text-slate-400"></i> 续借: {% if rule.allow_renew %}{{ rule.max_renew_count }}次{% else %}不允许{% endif %}</span>
+                                <span><i class="fas fa-calendar-plus mr-1 text-slate-400"></i> 续期: {{ rule.renew_days }}天</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            {% if not rule.is_active %}
+                            <form method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle_rule_status">
+                                <input type="hidden" name="rule_id" value="{{ rule.id }}">
+                                <button type="submit" class="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-bold rounded-lg hover:bg-emerald-200 transition-colors">启用</button>
+                            </form>
+                            {% else %}
+                            <form method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle_rule_status">
+                                <input type="hidden" name="rule_id" value="{{ rule.id }}">
+                                <button type="submit" class="px-3 py-1 bg-amber-100 text-amber-700 text-sm font-bold rounded-lg hover:bg-amber-200 transition-colors">禁用</button>
+                            </form>
+                            {% endif %}
+                            <button type="button" onclick="editRule({{ rule.id }}, '{{ rule.name }}', {{ rule.max_borrow_days }}, {{ rule.max_borrow_quantity }}, {{ rule.max_daily_requests }}, {% if rule.allow_renew %}true{% else %}false{% endif %}, {{ rule.max_renew_count }}, {{ rule.renew_days }})" class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-lg hover:bg-blue-200 transition-colors">编辑</button>
+                            <form method="post" class="inline" onsubmit="return confirm('确定要删除此规则吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_borrow_rule">
+                                <input type="hidden" name="rule_id" value="{{ rule.id }}">
+                                <button type="submit" class="px-3 py-1 bg-red-100 text-red-700 text-sm font-bold rounded-lg hover:bg-red-200 transition-colors">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-slate-400">
+                <i class="fas fa-inbox text-4xl mb-3"></i>
+                <p>暂无借阅规则，系统将使用默认配置</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Edit Rule Modal -->
+    <div id="editRuleModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">编辑借阅规则</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_borrow_rule">
+                <input type="hidden" name="rule_id" id="edit_rule_id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">规则名称</label>
+                        <input type="text" name="name" id="edit_name" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大借阅天数</label>
+                            <input type="number" name="max_borrow_days" id="edit_max_borrow_days" min="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">续借天数</label>
+                            <input type="number" name="renew_days" id="edit_renew_days" min="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大同时借阅数</label>
+                            <input type="number" name="max_borrow_quantity" id="edit_max_borrow_quantity" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">每日最大申请次数</label>
+                            <input type="number" name="max_daily_requests" id="edit_max_daily_requests" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            <span class="text-sm font-bold text-slate-800">允许续借</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="allow_renew" id="edit_allow_renew" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">最大续借次数</label>
+                            <input type="number" name="max_renew_count" id="edit_max_renew_count" min="0" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors">取消</button>
+                    <button type="submit" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function editRule(id, name, maxBorrowDays, maxBorrowQuantity, maxDailyRequests, allowRenew, maxRenewCount, renewDays) {
+        document.getElementById('edit_rule_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_max_borrow_days').value = maxBorrowDays;
+        document.getElementById('edit_max_borrow_quantity').value = maxBorrowQuantity;
+        document.getElementById('edit_max_daily_requests').value = maxDailyRequests;
+        document.getElementById('edit_allow_renew').checked = allowRenew;
+        document.getElementById('edit_max_renew_count').value = maxRenewCount;
+        document.getElementById('edit_renew_days').value = renewDays;
+        document.getElementById('editRuleModal').classList.remove('hidden');
+        document.getElementById('editRuleModal').classList.add('flex');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editRuleModal').classList.add('hidden');
+        document.getElementById('editRuleModal').classList.remove('flex');
+    }
+    </script>
+
+    <!-- Second Row: Announcements & Credit Logs -->
+    <div class="grid lg:grid-cols-2 gap-8">
         <!-- New Announcement -->
         <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
             <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">

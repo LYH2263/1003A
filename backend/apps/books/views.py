@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils.crypto import get_random_string
-from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation, Review, ReviewReply, BookList, BookListEntry
+from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation, Review, ReviewReply, BookList, BookListEntry, BorrowRule
 from apps.users.models import User, CreditLog
 from datetime import date, timedelta
 from django.utils import timezone
@@ -273,6 +273,9 @@ def book_detail(request, pk):
     
     has_reviewed = book.reviews.filter(user=request.user).exists() if request.user.is_authenticated else False
     
+    active_rule = BorrowRule.get_active_rule()
+    borrow_rule_summary = active_rule.get_rule_summary() if active_rule else "借期30天，可续借1次"
+    
     if request.user.is_authenticated:
         user_reservation = Reservation.objects.filter(
             user=request.user,
@@ -287,7 +290,8 @@ def book_detail(request, pk):
         'rating_info': rating_info,
         'reviews': reviews,
         'can_review': can_review,
-        'has_reviewed': has_reviewed
+        'has_reviewed': has_reviewed,
+        'borrow_rule_summary': borrow_rule_summary
     })
 
 @login_required
@@ -464,6 +468,8 @@ def borrow_request(request, pk):
     
     check_expired_reservations()
     
+    rule = BorrowRule.get_active_rule()
+    
     if LoanRecord.objects.filter(user=request.user, status='pending_payment').exists():
         messages.error(request, "您存在未缴纳的逾期罚款，请先缴费后再申请借阅。")
         return redirect('my_loans')
@@ -480,6 +486,24 @@ def borrow_request(request, pk):
         messages.warning(request, "您已申请或正在借阅此书，请勿重复操作。")
         return redirect('book_detail', pk=pk)
     
+    if rule and rule.max_borrow_quantity > 0:
+        current_borrowed = LoanRecord.objects.filter(
+            user=request.user, 
+            status__in=['pending', 'borrowed']
+        ).count()
+        if current_borrowed >= rule.max_borrow_quantity:
+            messages.error(request, f"借阅数量已达上限。当前规则：最多同时借阅{rule.max_borrow_quantity}本。")
+            return redirect('book_detail', pk=pk)
+    
+    if rule and rule.max_daily_requests > 0:
+        today_requests = LoanRecord.objects.filter(
+            user=request.user, 
+            borrow_date=date.today()
+        ).count()
+        if today_requests >= rule.max_daily_requests:
+            messages.error(request, f"今日申请次数已达上限。当前规则：每日最多申请{rule.max_daily_requests}次。")
+            return redirect('book_detail', pk=pk)
+    
     reservation = Reservation.objects.filter(
         user=request.user,
         book=book,
@@ -487,12 +511,26 @@ def borrow_request(request, pk):
     ).first()
     
     config = SiteConfig.get_solo()
+    
+    borrow_days = rule.max_borrow_days if rule else 30
+    rule_snapshot = rule.to_dict() if rule else {
+        'name': '默认规则',
+        'max_borrow_days': 30,
+        'max_borrow_quantity': 0,
+        'max_daily_requests': 0,
+        'allow_renew': True,
+        'max_renew_count': 1,
+        'renew_days': 15,
+    }
+    
+    import json
     LoanRecord.objects.create(
         user=request.user,
         book=book,
-        due_date=date.today() + timedelta(days=30),
+        due_date=date.today() + timedelta(days=borrow_days),
         status='pending',
-        fine_daily_rate=config.daily_fine_rate
+        fine_daily_rate=config.daily_fine_rate,
+        borrow_rule_snapshot=json.dumps(rule_snapshot)
     )
     
     if reservation:
@@ -521,6 +559,25 @@ def my_loans(request):
         'loans': loans_with_fine,
         'reservations': reservations
     })
+
+@login_required
+@require_POST
+def renew_loan(request, pk):
+    loan = get_object_or_404(LoanRecord, pk=pk, user=request.user)
+    
+    if not loan.can_renew():
+        messages.error(request, "该借阅记录无法续借。")
+        return redirect('my_loans')
+    
+    rule = loan.get_borrow_rule()
+    renew_days = rule.get('renew_days', 15)
+    
+    loan.due_date = loan.due_date + timedelta(days=renew_days)
+    loan.renew_count += 1
+    loan.save()
+    
+    messages.success(request, f"续借成功！应还日期已延长至 {loan.due_date.strftime('%Y-%m-%d')}。")
+    return redirect('my_loans')
     
 @login_required
 def user_manage(request):
@@ -613,6 +670,8 @@ def system_settings(request):
         return redirect('home')
     
     config = SiteConfig.get_solo()
+    borrow_rules = BorrowRule.objects.all()
+    active_rule = BorrowRule.get_active_rule()
     
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -632,6 +691,66 @@ def system_settings(request):
             Announcement.objects.create(title=title, content=content)
             messages.success(request, "公告发布成功。")
             return redirect('system_settings')
+        elif action == 'create_borrow_rule':
+            name = request.POST.get('name')
+            max_borrow_days = int(request.POST.get('max_borrow_days', 30))
+            max_borrow_quantity = int(request.POST.get('max_borrow_quantity', 0))
+            max_daily_requests = int(request.POST.get('max_daily_requests', 0))
+            allow_renew = request.POST.get('allow_renew') == 'on'
+            max_renew_count = int(request.POST.get('max_renew_count', 1))
+            renew_days = int(request.POST.get('renew_days', 15))
+            is_active = request.POST.get('is_active') == 'on'
+            
+            if is_active:
+                BorrowRule.objects.update(is_active=False)
+            
+            BorrowRule.objects.create(
+                name=name,
+                max_borrow_days=max_borrow_days,
+                max_borrow_quantity=max_borrow_quantity,
+                max_daily_requests=max_daily_requests,
+                allow_renew=allow_renew,
+                max_renew_count=max_renew_count,
+                renew_days=renew_days,
+                is_active=is_active
+            )
+            messages.success(request, "借阅规则创建成功。")
+            return redirect('system_settings')
+        elif action == 'edit_borrow_rule':
+            rule_id = request.POST.get('rule_id')
+            rule = get_object_or_404(BorrowRule, pk=rule_id)
+            rule.name = request.POST.get('name')
+            rule.max_borrow_days = int(request.POST.get('max_borrow_days', 30))
+            rule.max_borrow_quantity = int(request.POST.get('max_borrow_quantity', 0))
+            rule.max_daily_requests = int(request.POST.get('max_daily_requests', 0))
+            rule.allow_renew = request.POST.get('allow_renew') == 'on'
+            rule.max_renew_count = int(request.POST.get('max_renew_count', 1))
+            rule.renew_days = int(request.POST.get('renew_days', 15))
+            rule.save()
+            messages.success(request, "借阅规则已更新。")
+            return redirect('system_settings')
+        elif action == 'toggle_rule_status':
+            rule_id = request.POST.get('rule_id')
+            rule = get_object_or_404(BorrowRule, pk=rule_id)
+            if rule.is_active:
+                rule.is_active = False
+                rule.save()
+                messages.success(request, "规则已禁用。")
+            else:
+                BorrowRule.objects.update(is_active=False)
+                rule.is_active = True
+                rule.save()
+                messages.success(request, f"规则「{rule.name}」已设为当前启用规则。")
+            return redirect('system_settings')
+        elif action == 'delete_borrow_rule':
+            rule_id = request.POST.get('rule_id')
+            rule = get_object_or_404(BorrowRule, pk=rule_id)
+            if rule.is_active:
+                messages.error(request, "无法删除当前启用的规则，请先禁用。")
+            else:
+                rule.delete()
+                messages.success(request, "规则已删除。")
+            return redirect('system_settings')
             
     announcements = Announcement.objects.all().order_by('-created_at')
     
@@ -640,7 +759,9 @@ def system_settings(request):
     return render(request, 'admin/settings.html', {
         'announcements': announcements, 
         'config': config,
-        'credit_logs': credit_logs
+        'credit_logs': credit_logs,
+        'borrow_rules': borrow_rules,
+        'active_rule': active_rule
     })
 
 @login_required

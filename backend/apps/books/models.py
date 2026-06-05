@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from apps.users.models import User
+import json
 
 class Category(models.Model):
     name = models.CharField(max_length=50, verbose_name="分类名称")
@@ -49,11 +50,26 @@ class LoanRecord(models.Model):
     fine_paid = models.BooleanField(default=False, verbose_name="罚款已缴纳")
     fine_daily_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0.5, verbose_name="每日罚款单价")
     payment_date = models.DateField(null=True, blank=True, verbose_name="缴费日期")
+    borrow_rule_snapshot = models.TextField(default='{}', verbose_name="借阅规则快照")
+    renew_count = models.PositiveIntegerField(default=0, verbose_name="续借次数")
     
     class Meta:
         ordering = ['-borrow_date']
         verbose_name = "借阅记录"
         verbose_name_plural = verbose_name
+        
+    def get_borrow_rule(self):
+        try:
+            return json.loads(self.borrow_rule_snapshot)
+        except:
+            return {}
+    
+    def can_renew(self):
+        rule = self.get_borrow_rule()
+        if not rule or not rule.get('allow_renew', False):
+            return False
+        max_renew = rule.get('max_renew_count', 0)
+        return self.renew_count < max_renew and self.status == 'borrowed'
     
     def calculate_fine(self):
         from datetime import date
@@ -98,6 +114,52 @@ class SiteConfig(models.Model):
     def get_solo(cls):
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+
+class BorrowRule(models.Model):
+    name = models.CharField(max_length=100, verbose_name="规则名称")
+    max_borrow_days = models.PositiveIntegerField(default=30, verbose_name="最大借阅天数")
+    max_borrow_quantity = models.PositiveIntegerField(default=0, verbose_name="每人最大同时借阅数量", help_text="0表示无限制")
+    max_daily_requests = models.PositiveIntegerField(default=0, verbose_name="每日最大申请次数", help_text="0表示无限制")
+    allow_renew = models.BooleanField(default=True, verbose_name="是否允许续借")
+    max_renew_count = models.PositiveIntegerField(default=1, verbose_name="最大续借次数")
+    renew_days = models.PositiveIntegerField(default=15, verbose_name="续借天数")
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        ordering = ['-is_active', '-created_at']
+        verbose_name = "借阅规则"
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_active_rule(cls):
+        return cls.objects.filter(is_active=True).first()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'max_borrow_days': self.max_borrow_days,
+            'max_borrow_quantity': self.max_borrow_quantity,
+            'max_daily_requests': self.max_daily_requests,
+            'allow_renew': self.allow_renew,
+            'max_renew_count': self.max_renew_count,
+            'renew_days': self.renew_days,
+        }
+
+    def get_rule_summary(self):
+        summary = f"借期{self.max_borrow_days}天"
+        if self.allow_renew:
+            summary += f"，可续借{self.max_renew_count}次"
+        if self.max_borrow_quantity > 0:
+            summary += f"，限借{self.max_borrow_quantity}本"
+        if self.max_daily_requests > 0:
+            summary += f"，每日限申{self.max_daily_requests}次"
+        return summary
 
 class Reservation(models.Model):
     STATUS_CHOICES = (
