@@ -86,11 +86,12 @@ def profile_view(request):
             else:
                 request.user.set_password(new_password)
                 request.user.save()
-                login(request, request.user) # Keep user logged in
+                login(request, request.user)
                 messages.success(request, "密码修改成功。")
         return redirect('profile')
-        
-    return render(request, 'auth/profile.html')
+    
+    credit_logs = CreditLog.objects.filter(user=request.user).order_by('-created_at')[:20]
+    return render(request, 'auth/profile.html', {'credit_logs': credit_logs})
 
 @login_required
 def user_toggle_status(request, pk):
@@ -137,15 +138,30 @@ def user_adjust_credit(request, pk):
         points = int(request.POST.get('points', 0))
         reason = request.POST.get('reason', '')
         
-        if action_type == 'subtract':
+        is_add = action_type == 'add'
+        if not is_add:
             points = -points
             log_type = 'manual_subtract'
         else:
             log_type = 'manual_add'
         
-        user.update_credit(points, reason, request.user)
+        if is_add and user.credit_score >= 100:
+            messages.error(request, f"用户 {user.username} 信用分已达上限（100分），无法继续加分。")
+            return redirect('user_manage')
+        
+        if not is_add and user.credit_score <= 0:
+            messages.error(request, f"用户 {user.username} 信用分已达下限（0分），无法继续扣分。")
+            return redirect('user_manage')
+        
+        actual_change = user.update_credit(points, reason, request.user)
         CreditLog.objects.filter(user=user, reason=reason).update(log_type=log_type)
         
-        messages.success(request, f"已为用户 {user.username} 调整信用分 {points:+d} 分，当前信用分：{user.credit_score}")
+        if actual_change == 0:
+            if is_add:
+                messages.warning(request, f"用户 {user.username} 信用分已达上限，实际未增加。当前信用分：{user.credit_score}")
+            else:
+                messages.warning(request, f"用户 {user.username} 信用分已达下限，实际未扣减。当前信用分：{user.credit_score}")
+        else:
+            messages.success(request, f"已为用户 {user.username} 调整信用分 {actual_change:+d} 分，当前信用分：{user.credit_score}")
     
     return redirect('user_manage')

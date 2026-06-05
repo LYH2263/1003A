@@ -22,15 +22,23 @@ class User(AbstractUser):
         return f"{self.username} ({self.get_role_display()})"
 
     def update_credit(self, points, reason, operator=None):
-        self.credit_score = max(0, min(100, self.credit_score + points))
+        old_score = self.credit_score
+        new_score = max(0, min(100, old_score + points))
+        actual_change = new_score - old_score
+        
+        if actual_change == 0:
+            return 0
+        
+        self.credit_score = new_score
         self.save()
         CreditLog.objects.create(
             user=self,
-            points=points,
+            points=actual_change,
             balance_after=self.credit_score,
             reason=reason,
             operator=operator
         )
+        return actual_change
 
     def can_borrow(self):
         return self.credit_score >= 60
