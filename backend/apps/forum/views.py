@@ -41,8 +41,16 @@ def category_detail(request, category_id):
 
 def post_detail(request, post_id):
     post = get_object_or_404(Post, id=post_id)
-    post.views += 1
-    post.save()
+    
+    viewed_posts = request.session.get('viewed_posts', {})
+    post_id_str = str(post_id)
+    current_time = timezone.now().timestamp()
+    
+    if post_id_str not in viewed_posts or (current_time - viewed_posts[post_id_str]) > 3600:
+        post.views += 1
+        post.save()
+        viewed_posts[post_id_str] = current_time
+        request.session['viewed_posts'] = viewed_posts
     
     replies = Reply.objects.filter(post=post).select_related('author', 'parent_reply', 'parent_reply__author')
     
@@ -137,12 +145,50 @@ def toggle_pin_post(request, post_id):
 
 
 @login_required
+def edit_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    
+    if request.user != post.author and request.user.role != 'admin':
+        messages.error(request, '没有权限编辑此帖子。')
+        return redirect('post_detail', post_id=post.id)
+    
+    books = Book.objects.all()
+    
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        content = request.POST.get('content')
+        book_id = request.POST.get('book')
+        
+        if not title or not content:
+            messages.error(request, '标题和内容不能为空。')
+        else:
+            book = None
+            if book_id:
+                book = Book.objects.filter(id=book_id).first()
+            
+            post.title = title
+            post.content = content
+            post.book = book
+            post.save()
+            
+            messages.success(request, '帖子已更新。')
+            return redirect('post_detail', post_id=post.id)
+    
+    context = {
+        'post': post,
+        'books': books,
+    }
+    return render(request, 'forum/edit_post.html', context)
+
+
+@login_required
 def delete_post(request, post_id):
-    if request.user.role != 'admin':
+    post = get_object_or_404(Post, id=post_id)
+    
+    if request.user != post.author and request.user.role != 'admin':
         messages.error(request, '没有权限执行此操作。')
         return redirect('home')
     
-    post = get_object_or_404(Post, id=post_id)
     category_id = post.category.id
     post.delete()
     
@@ -152,11 +198,12 @@ def delete_post(request, post_id):
 
 @login_required
 def delete_reply(request, reply_id):
-    if request.user.role != 'admin':
+    reply = get_object_or_404(Reply, id=reply_id)
+    
+    if request.user != reply.author and request.user.role != 'admin':
         messages.error(request, '没有权限执行此操作。')
         return redirect('home')
     
-    reply = get_object_or_404(Reply, id=reply_id)
     post_id = reply.post.id
     reply.delete()
     
