@@ -73,21 +73,25 @@ class LoanRecord(models.Model):
     
     def calculate_fine(self):
         from datetime import date
-        if self.status == 'returned' and self.fine_paid:
-            return self.fine_amount
-        if self.status in ['pending_payment', 'borrowed']:
+        if self.status == 'returned' or self.status == 'pending_payment':
+            return float(self.fine_amount)
+        if self.status == 'borrowed':
             today = date.today()
-            check_date = self.return_date or today
-            if check_date > self.due_date:
-                overdue_days = (check_date - self.due_date).days
+            if today > self.due_date:
+                overdue_days = (today - self.due_date).days
                 return overdue_days * float(self.fine_daily_rate)
         return 0
     
     def get_overdue_days(self):
         from datetime import date
-        today = date.today()
-        if today > self.due_date and self.status in ['borrowed', 'pending_payment']:
-            return (today - self.due_date).days
+        if self.status == 'pending_payment' and self.return_date:
+            if self.return_date > self.due_date:
+                return (self.return_date - self.due_date).days
+            return 0
+        if self.status == 'borrowed':
+            today = date.today()
+            if today > self.due_date:
+                return (today - self.due_date).days
         return 0
 
 class Announcement(models.Model):

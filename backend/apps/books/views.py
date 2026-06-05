@@ -779,7 +779,10 @@ def system_settings(request):
             
     announcements = Announcement.objects.all().order_by('-created_at')
     
-    credit_logs = CreditLog.objects.all().select_related('user', 'operator').order_by('-created_at')[:50]
+    credit_logs_all = CreditLog.objects.all().select_related('user', 'operator').order_by('-created_at')
+    paginator = Paginator(credit_logs_all, 20)
+    page_number = request.GET.get('credit_page')
+    credit_logs = paginator.get_page(page_number)
     
     return render(request, 'admin/settings.html', {
         'announcements': announcements, 
