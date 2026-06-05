@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}评论管理 - 龙猫图书{% endblock %}
+{% block page_title %}评论管理{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-3xl shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">所有评论</h2>
+            <p class="text-sm text-slate-500 mt-1">共 {{ reviews.paginator.count }} 条评论</p>
+        </div>
+        <form class="relative w-full sm:w-80">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" name="q" value="{{ query }}" placeholder="搜索评论、用户或图书..." class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
+        </form>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+        {% for review in reviews %}
+        <div class="p-6 hover:bg-slate-50 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                            {{ review.user.username|first|upper }}
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-800">{{ review.user.username }}</span>
+                                <span class="text-slate-400">评论了</span>
+                                <a href="{% url 'book_detail' review.book.pk %}" class="text-indigo-600 font-medium hover:underline truncate">
+                                    《{{ review.book.title }}》
+                                </a>
+                            </div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div class="flex">
+                                    {% for i in '12345'|make_list %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star text-amber-400 text-xs"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-slate-300 text-xs"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <span class="text-xs text-slate-400">{{ review.created_at|date:"Y-m-d H:i:s" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-slate-700 bg-slate-50 p-4 rounded-xl">{{ review.content }}</p>
+                    
+                    {% if review.replies.all %}
+                    <div class="mt-4 pl-6 border-l-2 border-indigo-200 space-y-3">
+                        <p class="text-xs font-bold text-slate-500"><i class="fas fa-reply mr-1"></i> {{ review.replies.count }} 条回复</p>
+                        {% for reply in review.replies.all %}
+                        <div class="bg-white p-3 rounded-lg border border-slate-100">
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-xs font-bold">
+                                    {{ reply.user.username|first|upper }}
+                                </div>
+                                <span class="text-sm font-bold text-slate-700">{{ reply.user.username }}</span>
+                                <span class="text-xs text-slate-400">{{ reply.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                            <p class="text-sm text-slate-600 pl-8">{{ reply.content }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0">
+                    <button onclick="confirmDeleteReview({{ review.pk }})" class="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="删除评论">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="p-16 text-center">
+            <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-comments text-slate-300 text-3xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">暂无评论</h3>
+            <p class="text-slate-500">还没有用户发表评论</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if reviews.has_other_pages %}
+    <div class="p-6 border-t border-slate-100 flex items-center justify-between">
+        <div class="text-sm text-slate-500">
+            显示第 {{ reviews.start_index }} - {{ reviews.end_index }} 条，共 {{ reviews.paginator.count }} 条
+        </div>
+        <div class="flex items-center gap-2">
+            {% if reviews.has_previous %}
+            <a href="?page={{ reviews.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% endif %}
+            <span class="px-4 py-2 bg-primary text-white rounded-lg">
+                {{ reviews.number }} / {{ reviews.paginator.num_pages }}
+            </span>
+            {% if reviews.has_next %}
+            <a href="?page={{ reviews.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function confirmDeleteReview(reviewId) {
+    if (confirm('确定要删除这条评论吗？相关回复也会一并删除。')) {
+        window.location.href = '{% url "review_delete" 0 %}'.replace('0', reviewId) + '?from=manage';
+    }
+}
+</script>
+{% endblock %}

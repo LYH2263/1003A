@@ -3,7 +3,7 @@
 {% block page_title %}图书详情{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto">
+<div class="max-w-5xl mx-auto space-y-8">
     <div class="bg-white rounded-[40px] shadow-2xl shadow-slate-100 overflow-hidden md:flex p-10 md:p-16 gap-16 border border-slate-50">
         <!-- Left: Poster -->
         <div class="w-full md:w-80 shrink-0">
@@ -28,6 +28,25 @@
                 </div>
                 <h1 class="text-4xl font-extrabold text-slate-900 leading-tight italic">{{ book.title }}</h1>
                 <p class="text-xl text-slate-500 font-medium">作者: {{ book.author }}</p>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div class="rating-stars">
+                            {% for i in '12345'|make_list %}
+                                {% if forloop.counter <= rating_info.full_stars %}
+                                    <i class="fas fa-star text-amber-400"></i>
+                                {% elif forloop.counter == rating_info.full_stars|add:1 and rating_info.has_half_star %}
+                                    <i class="fas fa-star-half-alt text-amber-400"></i>
+                                {% else %}
+                                    <i class="far fa-star text-slate-300"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <span class="ml-2 text-2xl font-black text-slate-800">{{ rating_info.avg_rating|default:"0.0" }}</span>
+                    </div>
+                    <span class="text-slate-400">|</span>
+                    <span class="text-slate-500"><i class="fas fa-comments mr-1"></i> {{ rating_info.review_count }} 条评论</span>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-6 pb-8 border-b border-slate-100">
@@ -89,5 +108,198 @@
             </p>
         </div>
     </div>
+
+    <div class="bg-white rounded-[40px] shadow-2xl shadow-slate-100 p-10 md:p-16 border border-slate-50">
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-8 flex items-center">
+            <i class="fas fa-comments text-indigo-500 mr-3"></i>
+            读者评论
+            <span class="ml-3 text-sm font-normal text-slate-400">({{ rating_info.review_count }} 条)</span>
+        </h2>
+
+        {% if can_review and not has_reviewed %}
+        <div class="mb-10 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl border border-indigo-100">
+            <h3 class="font-bold text-slate-800 mb-4 flex items-center">
+                <i class="fas fa-pen-fancy text-indigo-500 mr-2"></i>
+                发表您的评论
+            </h3>
+            <form method="post" action="{% url 'review_create' book.pk %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-slate-600 mb-2">评分</label>
+                    <div class="star-rating flex space-x-2">
+                        {% for i in '54321'|make_list %}
+                        <label class="cursor-pointer">
+                            <input type="radio" name="rating" value="{{ i }}" class="hidden" required>
+                            <i class="far fa-star text-3xl text-slate-300 hover:text-amber-400 transition-colors" data-rating="{{ i }}"></i>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-slate-600 mb-2">评论内容</label>
+                    <textarea name="content" rows="4" maxlength="500" required
+                        class="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                        placeholder="分享您的阅读体验...（最多500字）"></textarea>
+                </div>
+                <button type="submit" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all">
+                    <i class="fas fa-paper-plane mr-2"></i> 发表评论
+                </button>
+            </form>
+        </div>
+        {% elif has_reviewed %}
+        <div class="mb-10 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+            <p class="text-emerald-700 flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                您已发表过评论，感谢您的分享！
+            </p>
+        </div>
+        {% elif not can_review and user.is_authenticated %}
+        <div class="mb-10 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+            <p class="text-amber-700 flex items-center">
+                <i class="fas fa-info-circle mr-2"></i>
+                只有借阅并归还过该书的读者才能发表评论。
+            </p>
+        </div>
+        {% endif %}
+
+        <div class="space-y-6">
+            {% for review in reviews %}
+            <div class="review-card p-6 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                            {{ review.user.username|first|upper }}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800">{{ review.user.username }}</h4>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <div class="flex">
+                                    {% for i in '12345'|make_list %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star text-amber-400 text-sm"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-slate-300 text-sm"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <span class="text-xs text-slate-400">{{ review.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% if user.role == 'admin' %}
+                    <button onclick="confirmDeleteReview({{ review.pk }})" class="text-red-500 hover:text-red-700 transition-colors" title="删除评论">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                <p class="text-slate-700 leading-relaxed mb-4">{{ review.content }}</p>
+                
+                <button onclick="toggleReplyForm({{ review.pk }})" class="text-sm text-indigo-500 hover:text-indigo-700 font-medium">
+                    <i class="fas fa-reply mr-1"></i> 回复
+                </button>
+
+                <form id="reply-form-{{ review.pk }}" method="post" action="{% url 'review_reply_create' review.pk %}" class="mt-4 hidden">
+                    {% csrf_token %}
+                    <div class="flex space-x-3">
+                        <textarea name="content" rows="2" maxlength="500" required
+                            class="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm"
+                            placeholder="写下您的回复..."></textarea>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all">
+                            发送
+                        </button>
+                    </div>
+                </form>
+
+                {% if review.replies.all %}
+                <div class="mt-4 pl-8 border-l-2 border-indigo-200 space-y-4">
+                    {% for reply in review.replies.all %}
+                    <div class="bg-white p-4 rounded-xl">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                                {{ reply.user.username|first|upper }}
+                            </div>
+                            <div>
+                                <span class="font-bold text-slate-700 text-sm">{{ reply.user.username }}</span>
+                                <span class="text-xs text-slate-400 ml-2">{{ reply.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                        </div>
+                        <p class="text-slate-600 text-sm">{{ reply.content }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="text-center py-16">
+                <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-comment-slash text-slate-300 text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">暂无评论</h3>
+                <p class="text-slate-500">成为第一个分享阅读体验的人吧！</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
+
+<script>
+function toggleReplyForm(reviewId) {
+    const form = document.getElementById('reply-form-' + reviewId);
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) {
+        form.querySelector('textarea').focus();
+    }
+}
+
+function confirmDeleteReview(reviewId) {
+    if (confirm('确定要删除这条评论吗？相关回复也会一并删除。')) {
+        window.location.href = '{% url "review_delete" 0 %}'.replace('0', reviewId);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const starLabels = document.querySelectorAll('.star-rating label');
+    starLabels.forEach(label => {
+        const star = label.querySelector('i');
+        const input = label.querySelector('input');
+        
+        star.addEventListener('click', function() {
+            const rating = parseInt(this.dataset.rating);
+            document.querySelectorAll('.star-rating i').forEach(s => {
+                if (parseInt(s.dataset.rating) <= rating) {
+                    s.classList.remove('far', 'text-slate-300');
+                    s.classList.add('fas', 'text-amber-400');
+                } else {
+                    s.classList.remove('fas', 'text-amber-400');
+                    s.classList.add('far', 'text-slate-300');
+                }
+            });
+        });
+
+        star.addEventListener('mouseenter', function() {
+            const rating = parseInt(this.dataset.rating);
+            document.querySelectorAll('.star-rating i').forEach(s => {
+                if (parseInt(s.dataset.rating) <= rating) {
+                    s.classList.remove('far', 'text-slate-300');
+                    s.classList.add('fas', 'text-amber-400');
+                }
+            });
+        });
+
+        star.addEventListener('mouseleave', function() {
+            const checkedInput = document.querySelector('.star-rating input:checked');
+            const currentRating = checkedInput ? parseInt(checkedInput.value) : 0;
+            document.querySelectorAll('.star-rating i').forEach(s => {
+                if (parseInt(s.dataset.rating) <= currentRating) {
+                    s.classList.remove('far', 'text-slate-300');
+                    s.classList.add('fas', 'text-amber-400');
+                } else {
+                    s.classList.remove('fas', 'text-amber-400');
+                    s.classList.add('far', 'text-slate-300');
+                }
+            });
+        });
+    });
+});
+</script>
 {% endblock %}

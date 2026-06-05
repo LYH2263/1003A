@@ -153,3 +153,35 @@ class Reservation(models.Model):
             )
             return next_reservation
         return None
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='reviews', verbose_name='图书')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews', verbose_name='评论者')
+    rating = models.PositiveSmallIntegerField(verbose_name='评分')
+    content = models.TextField(max_length=500, verbose_name='评论内容')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='发布时间')
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = '书评'
+        verbose_name_plural = verbose_name
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.book.title} ({self.rating}星)"
+    
+    def get_replies(self):
+        return self.replies.all().order_by('created_at')
+
+class ReviewReply(models.Model):
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='replies', verbose_name='所属评论')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_replies', verbose_name='回复者')
+    content = models.TextField(max_length=500, verbose_name='回复内容')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='回复时间')
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = '评论回复'
+        verbose_name_plural = verbose_name
+    
+    def __str__(self):
+        return f"{self.user.username} 回复 {self.review.user.username}"

@@ -64,6 +64,10 @@
                         <i class="fas fa-exchange-alt w-6"></i>
                         <span>借阅审核</span>
                     </a>
+                    <a href="{% url 'review_manage' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'review_manage' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
+                        <i class="fas fa-comments w-6"></i>
+                        <span>评论管理</span>
+                    </a>
                     <a href="{% url 'system_settings' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'system_settings' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
                         <i class="fas fa-cog w-6"></i>
                         <span>系统设置</span>
@@ -77,6 +81,10 @@
                     <a href="{% url 'my_loans' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'my_loans' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
                         <i class="fas fa-list w-6"></i>
                         <span>我的借阅</span>
+                    </a>
+                    <a href="{% url 'my_reviews' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'my_reviews' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
+                        <i class="fas fa-comment-alt w-6"></i>
+                        <span>我的评论</span>
                     </a>
                     <a href="{% url 'profile' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'profile' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
                         <i class="fas fa-user-circle w-6"></i>

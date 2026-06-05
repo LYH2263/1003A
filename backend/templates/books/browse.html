@@ -33,8 +33,13 @@
             </div>
         </div>
         <h4 class="font-black text-slate-900 leading-tight mb-2 line-clamp-1 italic">{{ book.title }}</h4>
+        <p class="text-xs text-slate-400 font-medium mb-2">{{ book.author }}</p>
         <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-400 font-medium">{{ book.author }}</span>
+            <div class="flex items-center space-x-1">
+                <i class="fas fa-star text-amber-400 text-xs"></i>
+                <span class="text-xs font-bold text-slate-700">{{ book.avg_rating|default:"0.0"|floatformat:1 }}</span>
+                <span class="text-[10px] text-slate-400">({{ book.review_count }})</span>
+            </div>
             <div class="flex items-center space-x-1">
                 <div class="w-1.5 h-1.5 rounded-full {% if book.stock > 0 %}bg-emerald-500 animate-pulse{% else %}bg-slate-300{% endif %}"></div>
                 <span class="text-[10px] font-bold text-slate-400">{% if book.stock > 0 %}有货{% else %}借罄{% endif %}</span>

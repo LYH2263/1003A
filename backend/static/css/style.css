@@ -2,3 +2,25 @@
 body { font-family: 'Inter', sans-serif; }
 .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
 .card-hover:hover { transform: translateY(-5px); transition: all 0.3s ease; }
+
+.star-rating label {
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.star-rating label:hover {
+    transform: scale(1.2);
+}
+.star-rating label input:checked ~ i {
+    color: #fbbf24 !important;
+}
+
+.review-card {
+    transition: all 0.2s ease;
+}
+.review-card:hover {
+    background-color: #f8fafc;
+}
+
+.rating-stars i {
+    margin-right: 2px;
+}

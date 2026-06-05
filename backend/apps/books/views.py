@@ -1,10 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Avg
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation
+from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation, Review, ReviewReply
 from apps.users.models import User, CreditLog
 from datetime import date, timedelta
 from django.utils import timezone
@@ -223,7 +223,10 @@ def book_browse(request):
     query = request.GET.get('q', '')
     category_id = request.GET.get('category', '')
     
-    books = Book.objects.all()
+    books = Book.objects.all().annotate(
+        avg_rating=Avg('reviews__rating'),
+        review_count=Count('reviews')
+    )
     if query:
         books = books.filter(Q(title__icontains=query) | Q(author__icontains=query) | Q(isbn__icontains=query))
     if category_id:
@@ -232,11 +235,40 @@ def book_browse(request):
     categories = Category.objects.all()
     return render(request, 'books/browse.html', {'books': books, 'categories': categories, 'query': query})
 
+def get_book_rating_info(book):
+    reviews = book.reviews.all()
+    review_count = reviews.count()
+    avg_rating = reviews.aggregate(Avg('rating'))['rating__avg']
+    if avg_rating:
+        avg_rating = round(avg_rating, 1)
+    return {
+        'review_count': review_count,
+        'avg_rating': avg_rating,
+        'full_stars': int(avg_rating) if avg_rating else 0,
+        'has_half_star': avg_rating and (avg_rating - int(avg_rating)) >= 0.5
+    }
+
+def can_review_book(user, book):
+    if not user.is_authenticated:
+        return False
+    return LoanRecord.objects.filter(
+        user=user,
+        book=book,
+        status='returned'
+    ).exists()
+
 @login_required
 def book_detail(request, pk):
     book = get_object_or_404(Book, pk=pk)
     user_reservation = None
     queue_count = 0
+    
+    rating_info = get_book_rating_info(book)
+    reviews = book.reviews.all().select_related('user').prefetch_related('replies__user')
+    can_review = can_review_book(request.user, book)
+    
+    has_reviewed = book.reviews.filter(user=request.user).exists() if request.user.is_authenticated else False
+    
     if request.user.is_authenticated:
         user_reservation = Reservation.objects.filter(
             user=request.user,
@@ -247,7 +279,112 @@ def book_detail(request, pk):
     return render(request, 'books/detail.html', {
         'book': book,
         'user_reservation': user_reservation,
-        'queue_count': queue_count
+        'queue_count': queue_count,
+        'rating_info': rating_info,
+        'reviews': reviews,
+        'can_review': can_review,
+        'has_reviewed': has_reviewed
+    })
+
+@login_required
+def review_create(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    
+    if not can_review_book(request.user, book):
+        messages.error(request, "只有借阅并归还过该书的读者才能发表评论。")
+        return redirect('book_detail', pk=pk)
+    
+    if book.reviews.filter(user=request.user).exists():
+        messages.error(request, "您已经对该书发表过评论了。")
+        return redirect('book_detail', pk=pk)
+    
+    if request.method == 'POST':
+        rating = int(request.POST.get('rating', 0))
+        content = request.POST.get('content', '').strip()
+        
+        if rating < 1 or rating > 5:
+            messages.error(request, "请选择有效的评分（1-5星）。")
+        elif not content:
+            messages.error(request, "评论内容不能为空。")
+        elif len(content) > 500:
+            messages.error(request, "评论内容不能超过500字。")
+        else:
+            Review.objects.create(
+                book=book,
+                user=request.user,
+                rating=rating,
+                content=content
+            )
+            messages.success(request, "评论发表成功！")
+            return redirect('book_detail', pk=pk)
+    
+    return redirect('book_detail', pk=pk)
+
+@login_required
+def review_reply_create(request, review_pk):
+    review = get_object_or_404(Review, pk=review_pk)
+    
+    if request.method == 'POST':
+        content = request.POST.get('content', '').strip()
+        
+        if not content:
+            messages.error(request, "回复内容不能为空。")
+        elif len(content) > 500:
+            messages.error(request, "回复内容不能超过500字。")
+        else:
+            ReviewReply.objects.create(
+                review=review,
+                user=request.user,
+                content=content
+            )
+            messages.success(request, "回复成功！")
+    
+    return redirect('book_detail', pk=review.book.pk)
+
+@login_required
+def review_delete(request, pk):
+    review = get_object_or_404(Review, pk=pk)
+    book_pk = review.book.pk
+    
+    if request.user.role != 'admin':
+        messages.error(request, "只有管理员可以删除评论。")
+        return redirect('book_detail', pk=book_pk)
+    
+    review.delete()
+    messages.success(request, "评论及相关回复已删除。")
+    
+    from_param = request.GET.get('from')
+    if from_param == 'manage':
+        return redirect('review_manage')
+    return redirect('book_detail', pk=book_pk)
+
+@login_required
+def my_reviews(request):
+    reviews = Review.objects.filter(user=request.user).select_related('book').order_by('-created_at')
+    return render(request, 'user/my_reviews.html', {'reviews': reviews})
+
+@login_required
+def review_manage(request):
+    if request.user.role != 'admin':
+        return redirect('home')
+    
+    query = request.GET.get('q', '')
+    reviews_list = Review.objects.all().select_related('user', 'book').prefetch_related('replies').order_by('-created_at')
+    
+    if query:
+        reviews_list = reviews_list.filter(
+            Q(content__icontains=query) | 
+            Q(user__username__icontains=query) | 
+            Q(book__title__icontains=query)
+        )
+    
+    paginator = Paginator(reviews_list, 10)
+    page_number = request.GET.get('page')
+    reviews = paginator.get_page(page_number)
+    
+    return render(request, 'admin/review_manage.html', {
+        'reviews': reviews,
+        'query': query
     })
 
 @login_required

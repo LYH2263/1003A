@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}我的评论 - 龙猫图书{% endblock %}
+{% block page_title %}我的评论历史{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-[40px] shadow-2xl shadow-slate-100 overflow-hidden border border-slate-50">
+        <div class="p-10 md:p-16">
+            <div class="flex items-center justify-between mb-10">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-slate-900">评论历史</h2>
+                    <p class="text-slate-500 mt-2">您共发表了 {{ reviews|length }} 条评论</p>
+                </div>
+                <a href="{% url 'my_loans' %}" class="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all">
+                    <i class="fas fa-arrow-left mr-2"></i> 返回借阅中心
+                </a>
+            </div>
+
+            <div class="space-y-6">
+                {% for review in reviews %}
+                <div class="p-6 bg-gradient-to-br from-slate-50 to-indigo-50 rounded-2xl border border-slate-100 hover:shadow-lg transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="w-16 h-16 rounded-2xl bg-white shadow-sm flex-shrink-0 overflow-hidden">
+                            {% if review.book.cover %}
+                            <img src="{{ review.book.cover.url }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <div class="w-full h-full flex items-center justify-center text-slate-300">
+                                <i class="fas fa-book text-2xl"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <a href="{% url 'book_detail' review.book.pk %}" class="font-bold text-lg text-slate-900 hover:text-indigo-600 transition-colors">
+                                        《{{ review.book.title }}》
+                                    </a>
+                                    <p class="text-sm text-slate-500">{{ review.book.author }}</p>
+                                </div>
+                                <span class="text-xs text-slate-400">{{ review.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                            <div class="flex items-center mb-3">
+                                <div class="flex mr-3">
+                                    {% for i in '12345'|make_list %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star text-amber-400 text-sm"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-slate-300 text-sm"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <span class="text-sm font-bold text-amber-600">{{ review.rating }} 星</span>
+                            </div>
+                            <p class="text-slate-700 leading-relaxed">{{ review.content }}</p>
+                            
+                            {% if review.replies.all %}
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <p class="text-xs font-bold text-slate-500 mb-3">
+                                    <i class="fas fa-reply mr-1"></i> {{ review.replies.count }} 条回复
+                                </p>
+                                <div class="space-y-3 pl-4 border-l-2 border-indigo-200">
+                                    {% for reply in review.replies.all %}
+                                    <div class="bg-white p-3 rounded-xl">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-xs font-bold">
+                                                {{ reply.user.username|first|upper }}
+                                            </div>
+                                            <span class="text-sm font-bold text-slate-700">{{ reply.user.username }}</span>
+                                            <span class="text-xs text-slate-400">{{ reply.created_at|date:"Y-m-d H:i" }}</span>
+                                        </div>
+                                        <p class="text-sm text-slate-600 pl-8">{{ reply.content }}</p>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-20">
+                    <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <i class="fas fa-comment-alt text-slate-300 text-4xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">暂无评论记录</h3>
+                    <p class="text-slate-500 mb-8">借阅并归还图书后，即可发表您的阅读心得</p>
+                    <a href="{% url 'book_browse' %}" class="inline-flex items-center px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100">
+                        <i class="fas fa-book-open mr-2"></i> 去发现好书
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
