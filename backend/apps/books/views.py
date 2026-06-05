@@ -579,8 +579,20 @@ def my_loans(request):
 def renew_loan(request, pk):
     loan = get_object_or_404(LoanRecord, pk=pk, user=request.user)
     
+    if loan.status != 'borrowed':
+        messages.error(request, "只有借阅中的记录才能续借。")
+        return redirect('my_loans')
+    
+    if loan.is_overdue():
+        messages.error(request, "该借阅已逾期，无法续借。请尽快归还图书。")
+        return redirect('my_loans')
+    
     if not loan.can_renew():
-        messages.error(request, "该借阅记录无法续借。")
+        rule = loan.get_borrow_rule()
+        if not rule or not rule.get('allow_renew', False):
+            messages.error(request, "该借阅规则不允许续借。")
+        else:
+            messages.error(request, "已达到最大续借次数。")
         return redirect('my_loans')
     
     rule = loan.get_borrow_rule()

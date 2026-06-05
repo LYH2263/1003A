@@ -69,7 +69,20 @@ class LoanRecord(models.Model):
         if not rule or not rule.get('allow_renew', False):
             return False
         max_renew = rule.get('max_renew_count', 0)
-        return self.renew_count < max_renew and self.status == 'borrowed'
+        if self.renew_count >= max_renew:
+            return False
+        if self.status != 'borrowed':
+            return False
+        from datetime import date
+        if date.today() > self.due_date:
+            return False
+        return True
+
+    def is_overdue(self):
+        from datetime import date
+        if self.status == 'borrowed' and date.today() > self.due_date:
+            return True
+        return False
     
     def calculate_fine(self):
         from datetime import date
