@@ -193,6 +193,19 @@ class Reservation(models.Model):
             self.queue_position = waiting_count + 1
         super().save(*args, **kwargs)
     
+    def cancel(self):
+        self.status = 'cancelled'
+        self.save()
+        Reservation.update_queue_positions(self.book)
+    
+    @staticmethod
+    def update_queue_positions(book):
+        waiting_reservations = Reservation.objects.filter(book=book, status='waiting').order_by('created_at')
+        for idx, res in enumerate(waiting_reservations, 1):
+            if res.queue_position != idx:
+                res.queue_position = idx
+                res.save(update_fields=['queue_position'])
+    
     def is_expired(self):
         if self.expire_at and timezone.now() > self.expire_at:
             return True
@@ -207,6 +220,7 @@ class Reservation(models.Model):
             next_reservation.notified_at = timezone.now()
             next_reservation.expire_at = timezone.now() + timezone.timedelta(hours=48)
             next_reservation.save()
+            Reservation.update_queue_positions(book)
             
             Announcement.objects.create(
                 title=f"预约到货通知：《{book.title}》",

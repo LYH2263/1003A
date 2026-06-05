@@ -151,6 +151,7 @@ def book_edit(request, pk):
         return redirect('home')
         
     book = get_object_or_404(Book, pk=pk)
+    old_stock = book.stock
     
     if request.method == 'POST':
         book.title = request.POST.get('title')
@@ -176,6 +177,18 @@ def book_edit(request, pk):
             book.cover = request.FILES.get('cover')
             
         book.save()
+        
+        # If stock was 0 and now > 0, notify waiting readers
+        if old_stock == 0 and book.stock > 0:
+            notified_count = 0
+            while book.stock > notified_count:
+                notified = Reservation.notify_next_reader(book)
+                if not notified:
+                    break
+                notified_count += 1
+            if notified_count > 0:
+                messages.info(request, f"已通知 {notified_count} 位预约读者图书到货。")
+        
         messages.success(request, f"图书《{book.title}》信息已更新。")
         
     return redirect('book_manage')
@@ -429,8 +442,7 @@ def cancel_reservation(request, pk):
     book = reservation.book
     
     if reservation.status in ['waiting', 'notified']:
-        reservation.status = 'cancelled'
-        reservation.save()
+        reservation.cancel()
         messages.success(request, "预约已取消。")
     
     return redirect('book_detail', pk=book.pk)
@@ -449,8 +461,7 @@ def remove_reservation(request, pk):
         return redirect('home')
     reservation = get_object_or_404(Reservation, pk=pk)
     book_pk = reservation.book.pk
-    reservation.status = 'cancelled'
-    reservation.save()
+    reservation.cancel()
     messages.success(request, f"已移除 {reservation.user.username} 的预约。")
     return redirect('reservation_queue', pk=book_pk)
 
@@ -460,6 +471,7 @@ def check_expired_reservations():
     for res in expired:
         res.status = 'expired'
         res.save()
+        Reservation.update_queue_positions(res.book)
         Reservation.notify_next_reader(res.book)
 
 @login_required
@@ -598,6 +610,19 @@ def audit_loan(request, pk, action):
             loan.book.stock -= 1
             loan.book.save()
             loan.save()
+            
+            reservation = Reservation.objects.filter(
+                user=loan.user,
+                book=loan.book,
+                status='notified'
+            ).first()
+            if reservation:
+                reservation.status = 'completed'
+                reservation.save()
+            
+            if loan.book.stock > 0:
+                Reservation.notify_next_reader(loan.book)
+            
             messages.success(request, "借阅申请已批准。")
         else:
             messages.error(request, "库存不足，无法批准。")
