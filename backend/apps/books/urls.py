@@ -15,6 +15,12 @@ urlpatterns = [
     path('books/<int:pk>/borrow/', views.borrow_request, name='borrow_request'),
     path('books/<int:pk>/delete/', views.book_delete, name='book_delete'),
     
+    # Reservation System
+    path('books/<int:pk>/reserve/', views.join_reservation, name='join_reservation'),
+    path('reservations/<int:pk>/cancel/', views.cancel_reservation, name='cancel_reservation'),
+    path('books/<int:pk>/reservations/', views.reservation_queue, name='reservation_queue'),
+    path('reservations/<int:pk>/remove/', views.remove_reservation, name='remove_reservation'),
+    
     # Loan Management
     path('my-loans/', views.my_loans, name='my_loans'),
     path('users/manage/', views.user_manage, name='user_manage'),

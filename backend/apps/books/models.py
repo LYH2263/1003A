@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from apps.users.models import User
 
 class Category(models.Model):
@@ -72,3 +73,58 @@ class SiteConfig(models.Model):
     def get_solo(cls):
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+
+class Reservation(models.Model):
+    STATUS_CHOICES = (
+        ('waiting', '排队中'),
+        ('notified', '已通知'),
+        ('completed', '已完成'),
+        ('cancelled', '已取消'),
+        ('expired', '已过期'),
+    )
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="预约人")
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, verbose_name="图书")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting', verbose_name="状态")
+    queue_position = models.PositiveIntegerField(default=0, verbose_name="排队位置")
+    notified_at = models.DateTimeField(null=True, blank=True, verbose_name="通知时间")
+    expire_at = models.DateTimeField(null=True, blank=True, verbose_name="过期时间")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="预约时间")
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "预约记录"
+        verbose_name_plural = verbose_name
+        unique_together = ['user', 'book', 'status']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.book.title}"
+    
+    def save(self, *args, **kwargs):
+        if self.pk is None:
+            waiting_count = Reservation.objects.filter(book=self.book, status='waiting').count()
+            self.queue_position = waiting_count + 1
+        super().save(*args, **kwargs)
+    
+    def is_expired(self):
+        if self.expire_at and timezone.now() > self.expire_at:
+            return True
+        return False
+    
+    @staticmethod
+    def notify_next_reader(book):
+        waiting_reservations = Reservation.objects.filter(book=book, status='waiting').order_by('created_at')
+        if waiting_reservations.exists():
+            next_reservation = waiting_reservations.first()
+            next_reservation.status = 'notified'
+            next_reservation.notified_at = timezone.now()
+            next_reservation.expire_at = timezone.now() + timezone.timedelta(hours=48)
+            next_reservation.save()
+            
+            Announcement.objects.create(
+                title=f"预约到货通知：《{book.title}》",
+                content=f"尊敬的 {next_reservation.user.username}，您预约的图书《{book.title}》现已可借阅。请在48小时内发起借阅申请，逾期将自动取消您的预约资格。",
+                is_active=True
+            )
+            return next_reservation
+        return None

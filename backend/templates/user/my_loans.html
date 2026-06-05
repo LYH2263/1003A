@@ -3,6 +3,69 @@
 {% block page_title %}我的借阅清单{% endblock %}
 
 {% block content %}
+{% if reservations %}
+<div class="mb-8">
+    <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
+        <i class="fas fa-calendar-check text-amber-500 mr-2"></i>
+        我的预约
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {% for reservation in reservations %}
+        <div class="bg-white rounded-3xl p-6 shadow-sm border {% if reservation.status == 'notified' %}border-emerald-200 bg-emerald-50{% else %}border-slate-100{% endif %} flex gap-6 group hover:shadow-xl transition-all">
+            <div class="w-24 shrink-0 aspect-[3/4] rounded-xl overflow-hidden bg-slate-100">
+                {% if reservation.book.cover %}
+                    <img src="{{ reservation.book.cover.url }}" class="w-full h-full object-cover">
+                {% else %}
+                    <div class="w-full h-full flex items-center justify-center text-slate-300">
+                        <i class="fas fa-book"></i>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="px-2 py-1 text-[10px] font-bold rounded-md 
+                            {% if reservation.status == 'notified' %}bg-emerald-500 text-white{% else %}bg-amber-100 text-amber-600{% endif %}">
+                            {% if reservation.status == 'notified' %}预约到货{% else %}排队中{% endif %}
+                        </span>
+                        <span class="text-[10px] text-slate-400">{{ reservation.created_at|date:"Y/m/d" }}</span>
+                    </div>
+                    <h4 class="font-bold text-slate-800 line-clamp-1">{{ reservation.book.title }}</h4>
+                    <p class="text-xs text-slate-500 mt-1">
+                        {% if reservation.status == 'notified' %}
+                            请在 {{ reservation.expire_at|date:"Y-m-d H:i" }} 前借阅
+                        {% else %}
+                            当前排队位置：第 {{ reservation.queue_position }} 位
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                    {% if reservation.status == 'notified' %}
+                    <a href="{% url 'book_detail' reservation.book.pk %}" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-700">
+                        立即借阅 <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                    {% else %}
+                    <form action="{% url 'cancel_reservation' reservation.pk %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="text-[10px] font-bold text-rose-500 hover:text-rose-600" onclick="return confirm('确定取消预约？')">
+                            取消预约 <i class="fas fa-times ml-1"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="mb-4">
+    <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
+        <i class="fas fa-book-open text-indigo-500 mr-2"></i>
+        我的借阅
+    </h3>
+</div>
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
     {% for loan in loans %}
     <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex gap-6 group hover:shadow-xl transition-all">

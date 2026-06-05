@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load credit_tags %}
 {% block title %}图书管理 - 龙猫图书{% endblock %}
 {% block page_title %}全部图书库{% endblock %}
 
@@ -53,8 +54,18 @@
                         <div class="w-24 h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
                             <div class="h-full bg-primary" style="width: {% widthratio book.stock book.total_stock 100 %}%"></div>
                         </div>
+                        {% if reservation_counts|get_item:book.id > 0 %}
+                        <div class="mt-2">
+                            <span class="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                <i class="fas fa-users mr-1"></i> {{ reservation_counts|get_item:book.id }} 人预约
+                            </span>
+                        </div>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 text-center space-x-2">
+                        <a href="{% url 'reservation_queue' book.pk %}" class="p-2 text-slate-400 hover:text-amber-500 transition-colors inline-block" title="查看预约队列">
+                            <i class="fas fa-list"></i>
+                        </a>
                         <button onclick="openBookModal('{{ book.pk }}', '{{ book.title }}', '{{ book.author }}', '{{ book.isbn }}', '{{ book.category.id }}', '{{ book.total_stock }}', `{{ book.description|escapejs }}`)" class="p-2 text-slate-400 hover:text-primary transition-colors">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -68,7 +79,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="px-6 py-10 text-center text-slate-400 text-sm">暂无图书数据</td>
+                    <td colspan="6" class="px-6 py-10 text-center text-slate-400 text-sm">暂无图书数据</td>
                 </tr>
                 {% endfor %}
             </tbody>

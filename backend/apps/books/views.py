@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db.models import Count, Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from .models import Book, LoanRecord, Announcement, Category, SiteConfig
+from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation
 from apps.users.models import User, CreditLog
 from datetime import date, timedelta
 from django.utils import timezone
@@ -67,6 +67,8 @@ def book_manage(request):
     if request.user.role != 'admin':
         return redirect('home')
     
+    check_expired_reservations()
+    
     query = request.GET.get('q', '')
     books_list = Book.objects.all().order_by('-created_at')
     
@@ -77,8 +79,17 @@ def book_manage(request):
     page_number = request.GET.get('page')
     books = paginator.get_page(page_number)
     
+    reservation_counts = {}
+    for book in books:
+        count = Reservation.objects.filter(book=book, status__in=['waiting', 'notified']).count()
+        reservation_counts[book.id] = count
+    
     categories = Category.objects.all()
-    return render(request, 'admin/book_list.html', {'books': books, 'categories': categories})
+    return render(request, 'admin/book_list.html', {
+        'books': books,
+        'categories': categories,
+        'reservation_counts': reservation_counts
+    })
 
 @login_required
 def book_create(request):
@@ -162,6 +173,8 @@ def loan_manage(request):
     if request.user.role != 'admin':
         return redirect('home')
     
+    check_expired_reservations()
+    
     loans_list = LoanRecord.objects.all().order_by('-borrow_date')
     
     # Filtering
@@ -177,7 +190,15 @@ def loan_manage(request):
     page_number = request.GET.get('page')
     loans = paginator.get_page(page_number)
     
-    return render(request, 'admin/loan_list.html', {'loans': loans})
+    reservation_counts = {}
+    for loan in loans:
+        count = Reservation.objects.filter(book=loan.book, status='waiting').count()
+        reservation_counts[loan.book.id] = count
+    
+    return render(request, 'admin/loan_list.html', {
+        'loans': loans,
+        'reservation_counts': reservation_counts
+    })
 
 @login_required
 def book_browse(request):
@@ -196,11 +217,94 @@ def book_browse(request):
 @login_required
 def book_detail(request, pk):
     book = get_object_or_404(Book, pk=pk)
-    return render(request, 'books/detail.html', {'book': book})
+    user_reservation = None
+    queue_count = 0
+    if request.user.is_authenticated:
+        user_reservation = Reservation.objects.filter(
+            user=request.user,
+            book=book,
+            status__in=['waiting', 'notified']
+        ).first()
+        queue_count = Reservation.objects.filter(book=book, status='waiting').count()
+    return render(request, 'books/detail.html', {
+        'book': book,
+        'user_reservation': user_reservation,
+        'queue_count': queue_count
+    })
+
+@login_required
+def join_reservation(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    
+    if book.stock > 0:
+        messages.warning(request, "该书仍有库存，可直接借阅。")
+        return redirect('book_detail', pk=pk)
+    
+    existing = Reservation.objects.filter(
+        user=request.user,
+        book=book,
+        status__in=['waiting', 'notified']
+    ).first()
+    
+    if existing:
+        if existing.status == 'notified':
+            messages.warning(request, "您已收到预约到货通知，请在48小时内发起借阅。")
+        else:
+            messages.warning(request, "您已在排队中。")
+        return redirect('book_detail', pk=pk)
+    
+    Reservation.objects.create(
+        user=request.user,
+        book=book
+    )
+    messages.success(request, "成功加入预约队列！图书到货后将按顺序通知您。")
+    return redirect('book_detail', pk=pk)
+
+@login_required
+def cancel_reservation(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk, user=request.user)
+    book = reservation.book
+    
+    if reservation.status in ['waiting', 'notified']:
+        reservation.status = 'cancelled'
+        reservation.save()
+        messages.success(request, "预约已取消。")
+    
+    return redirect('book_detail', pk=book.pk)
+
+@login_required
+def reservation_queue(request, pk):
+    if request.user.role != 'admin':
+        return redirect('home')
+    book = get_object_or_404(Book, pk=pk)
+    reservations = Reservation.objects.filter(book=book, status__in=['waiting', 'notified']).order_by('created_at')
+    return render(request, 'admin/reservation_queue.html', {'book': book, 'reservations': reservations})
+
+@login_required
+def remove_reservation(request, pk):
+    if request.user.role != 'admin':
+        return redirect('home')
+    reservation = get_object_or_404(Reservation, pk=pk)
+    book_pk = reservation.book.pk
+    reservation.status = 'cancelled'
+    reservation.save()
+    messages.success(request, f"已移除 {reservation.user.username} 的预约。")
+    return redirect('reservation_queue', pk=book_pk)
+
+def check_expired_reservations():
+    now = timezone.now()
+    expired = Reservation.objects.filter(status='notified', expire_at__lte=now)
+    for res in expired:
+        res.status = 'expired'
+        res.save()
+        Reservation.notify_next_reader(res.book)
 
 @login_required
 def borrow_request(request, pk):
     book = get_object_or_404(Book, pk=pk)
+    
+    check_expired_reservations()
+    
     if book.stock <= 0:
         messages.error(request, "该图书目前无库存，无法借阅。")
         return redirect('book_detail', pk=pk)
@@ -212,20 +316,39 @@ def borrow_request(request, pk):
     if LoanRecord.objects.filter(user=request.user, book=book, status__in=['pending', 'borrowed']).exists():
         messages.warning(request, "您已申请或正在借阅此书，请勿重复操作。")
         return redirect('book_detail', pk=pk)
-        
+    
+    reservation = Reservation.objects.filter(
+        user=request.user,
+        book=book,
+        status='notified'
+    ).first()
+    
     LoanRecord.objects.create(
         user=request.user,
         book=book,
         due_date=date.today() + timedelta(days=30),
         status='pending'
     )
+    
+    if reservation:
+        reservation.status = 'completed'
+        reservation.save()
+    
     messages.success(request, "借阅申请已提交，请等待管理员审核。")
     return redirect('my_loans')
 
 @login_required
 def my_loans(request):
+    check_expired_reservations()
     loans = LoanRecord.objects.filter(user=request.user).order_by('-borrow_date')
-    return render(request, 'user/my_loans.html', {'loans': loans})
+    reservations = Reservation.objects.filter(
+        user=request.user,
+        status__in=['waiting', 'notified']
+    ).order_by('-created_at')
+    return render(request, 'user/my_loans.html', {
+        'loans': loans,
+        'reservations': reservations
+    })
     
 @login_required
 def user_manage(request):
@@ -278,6 +401,10 @@ def audit_loan(request, pk, action):
         loan.user.update_credit(points, reason, request.user)
         CreditLog.objects.filter(user=loan.user, reason=reason).update(log_type=log_type)
         
+        notified_reservation = Reservation.notify_next_reader(loan.book)
+        if notified_reservation:
+            messages.info(request, f"已通知预约读者：{notified_reservation.user.username}")
+        
         messages.success(request, f"图书已成功归还。信用分{points:+d}分，当前信用分：{loan.user.credit_score}")
         
     return redirect('loan_manage')
@@ -326,15 +453,25 @@ def announcement_create(request):
     return redirect('system_settings')
     
 def home(request):
+    check_expired_reservations()
+    
     announcements = Announcement.objects.filter(is_active=True).order_by('-created_at')[:5]
     latest_books = Book.objects.all().order_by('-created_at')[:8]
     config = SiteConfig.get_solo()
     
     credit_ranking = User.objects.filter(role='reader', is_active=True).order_by('-credit_score')[:10]
     
+    user_notifications = []
+    if request.user.is_authenticated:
+        user_notifications = Announcement.objects.filter(
+            is_active=True,
+            content__contains=request.user.username
+        ).order_by('-created_at')[:3]
+    
     return render(request, 'books/home.html', {
         'announcements': announcements,
         'latest_books': latest_books,
         'config': config,
-        'credit_ranking': credit_ranking
+        'credit_ranking': credit_ranking,
+        'user_notifications': user_notifications
     })

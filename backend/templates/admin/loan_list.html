@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load credit_tags %}
 {% block title %}借阅管理 - 龙猫图书{% endblock %}
 {% block page_title %}借阅审计中心{% endblock %}
 
@@ -62,6 +63,11 @@
                     </td>
                     <td class="px-6 py-4">
                         <p class="text-sm font-bold text-slate-800">{{ loan.book.title }}</p>
+                        {% if reservation_counts|get_item:loan.book.id > 0 %}
+                        <span class="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded mt-1 inline-block">
+                            <i class="fas fa-users mr-1"></i> {{ reservation_counts|get_item:loan.book.id }} 人排队
+                        </span>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex flex-col text-xs">

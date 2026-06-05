@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}预约队列管理 - 龙猫图书{% endblock %}
+{% block page_title %}预约队列管理{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+    <!-- Header -->
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="{% url 'book_manage' %}" class="p-2 text-slate-400 hover:text-primary transition-colors">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h3 class="text-lg font-bold text-slate-800">《{{ book.title }}》预约队列</h3>
+                <p class="text-sm text-slate-500">作者: {{ book.author }} | 当前库存: {{ book.stock }} / {{ book.total_stock }}</p>
+            </div>
+        </div>
+        <div class="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-sm font-bold">
+            <i class="fas fa-users mr-1"></i> {{ reservations|length }} 人排队
+        </div>
+    </div>
+
+    <!-- Queue Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-4">排队位置</th>
+                    <th class="px-6 py-4">读者信息</th>
+                    <th class="px-6 py-4">状态</th>
+                    <th class="px-6 py-4">预约时间</th>
+                    <th class="px-6 py-4">过期时间</th>
+                    <th class="px-6 py-4 text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for reservation in reservations %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                            {% if forloop.counter == 1 %}bg-emerald-100 text-emerald-600
+                            {% elif forloop.counter == 2 %}bg-amber-100 text-amber-600
+                            {% elif forloop.counter == 3 %}bg-orange-100 text-orange-600
+                            {% else %}bg-slate-100 text-slate-500{% endif %}">
+                            {{ forloop.counter }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                {{ reservation.user.username|first|upper }}
+                            </div>
+                            <div>
+                                <span class="font-bold text-slate-700 text-sm">{{ reservation.user.username }}</span>
+                                <p class="text-xs text-slate-400">信用分: {{ reservation.user.credit_score }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-[10px] font-bold rounded-md 
+                            {% if reservation.status == 'notified' %}bg-emerald-50 text-emerald-600
+                            {% else %}bg-amber-50 text-amber-600{% endif %}">
+                            {{ reservation.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-500">
+                        {{ reservation.created_at|date:"Y-m-d H:i" }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if reservation.expire_at %}
+                        <span class="text-sm {% if reservation.is_expired %}text-red-500{% else %}text-slate-500{% endif %}">
+                            {{ reservation.expire_at|date:"Y-m-d H:i" }}
+                        </span>
+                        {% else %}
+                        <span class="text-sm text-slate-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <form action="{% url 'remove_reservation' reservation.pk %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="p-1 px-3 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-100" onclick="return confirm('确定移除该读者的预约？')">
+                                <i class="fas fa-user-minus mr-1"></i> 移除
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-10 text-center text-slate-400 text-sm">
+                        <i class="fas fa-inbox text-4xl mb-4 block text-slate-200"></i>
+                        暂无预约记录
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

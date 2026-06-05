@@ -56,14 +56,32 @@
                         <i class="fas fa-hand-holding-heart mr-2"></i> 立即申请借阅
                     </a>
                 {% else %}
-                    <button class="flex-1 py-4 bg-slate-200 text-slate-500 font-bold rounded-2xl cursor-not-allowed">
-                        <i class="fas fa-times-circle mr-2"></i> 库存不足
-                    </button>
+                    {% if user_reservation %}
+                        {% if user_reservation.status == 'notified' %}
+                            <div class="flex-1 py-4 bg-emerald-500 text-white text-center font-bold rounded-2xl shadow-xl shadow-emerald-100">
+                                <i class="fas fa-bell mr-2"></i> 预约到货！请在48小时内借阅
+                            </div>
+                        {% else %}
+                            <div class="flex-1 py-4 bg-amber-500 text-white text-center font-bold rounded-2xl shadow-xl shadow-amber-100">
+                                <i class="fas fa-clock mr-2"></i> 排队中（第 {{ user_reservation.queue_position }} 位）
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <a href="{% url 'join_reservation' book.pk %}" class="flex-1 py-4 bg-amber-500 text-white text-center font-bold rounded-2xl hover:bg-amber-600 shadow-xl shadow-amber-100 transition-all hover:scale-[1.02] active:scale-95">
+                            <i class="fas fa-user-plus mr-2"></i> 加入预约队列
+                        </a>
+                    {% endif %}
                 {% endif %}
                 <button onclick="history.back()" class="px-8 py-4 border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all">
                     返回列表
                 </button>
             </div>
+            
+            {% if book.stock == 0 and queue_count > 0 and not user_reservation %}
+            <div class="mt-4 text-center text-sm text-slate-500">
+                <i class="fas fa-users mr-1"></i> 当前已有 {{ queue_count }} 人在排队预约
+            </div>
+            {% endif %}
             
             <p class="text-center md:text-left text-xs text-slate-400 flex items-center justify-center md:justify-start">
                 <i class="fas fa-shield-alt mr-2 text-indigo-300"></i>
