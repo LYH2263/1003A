@@ -136,7 +136,7 @@
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-xl font-bold text-slate-900" id="modal-title">创建新书单</h3>
-                <button onclick="closeModal('create-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                <button onclick="event.stopPropagation(); closeModal('create-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -188,7 +188,7 @@
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-xl font-bold text-slate-900">添加到书单</h3>
-                <button onclick="closeModal('add-to-list-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                <button onclick="event.stopPropagation(); closeModal('add-to-list-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -215,7 +215,7 @@
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-xl font-bold text-slate-900">分享书单</h3>
-                <button onclick="closeModal('share-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                <button onclick="event.stopPropagation(); closeModal('share-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -280,7 +280,17 @@ function selectBookList(listId, element) {
     element.classList.add('border-indigo-500', 'bg-indigo-50');
 }
 
+let currentActionMenu = null;
+let closeMenuHandler = null;
+
 function showListActions(listId, listName, visibility) {
+    if (currentActionMenu) {
+        currentActionMenu.remove();
+        document.removeEventListener('click', closeMenuHandler);
+        currentActionMenu = null;
+        closeMenuHandler = null;
+    }
+    
     const actions = [
         { label: '编辑', icon: 'fa-edit', action: () => openEditModal(listId, listName, document.querySelector(`[data-list-id="${listId}"]`).dataset.listDesc, visibility) },
         { label: '分享', icon: 'fa-share-alt', action: () => shareBookList(listId) },
@@ -300,22 +310,38 @@ function showListActions(listId, listName, visibility) {
         const btn = document.createElement('button');
         btn.className = `w-full text-left px-4 py-2 rounded-xl text-sm font-medium transition-colors ${a.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`;
         btn.innerHTML = `<i class="fas ${a.icon} mr-2"></i> ${a.label}`;
-        btn.onclick = () => { menu.remove(); a.action(); };
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            menu.remove();
+            document.removeEventListener('click', closeMenuHandler);
+            currentActionMenu = null;
+            closeMenuHandler = null;
+            a.action();
+        };
         menu.appendChild(btn);
     });
     
     document.body.appendChild(menu);
+    currentActionMenu = menu;
+    
+    closeMenuHandler = function(e) {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenuHandler);
+            currentActionMenu = null;
+            closeMenuHandler = null;
+        }
+    };
+    
     setTimeout(() => {
-        document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        });
-    }, 0);
+        document.addEventListener('click', closeMenuHandler);
+    }, 10);
 }
 
 function shareBookList(listId) {
+    if (!confirm('是否将书单设为公开并生成分享链接？其他用户可通过链接查看此书单。')) {
+        return;
+    }
     fetch(`/book-lists/${listId}/share/`)
     .then(response => response.json())
     .then(data => {
@@ -403,7 +429,7 @@ function removeBookFromList(listId, bookId, element) {
 
 function removeFromAllLists(bookId) {
     if (confirm('确定要将这本书从所有书单中移除吗？')) {
-        fetch(`/books/${bookId}/toggle-favorite/`, {
+        fetch(`/books/${bookId}/remove-from-all-lists/`, {
             method: 'POST',
             headers: { 'X-CSRFToken': getCookie('csrftoken') }
         })

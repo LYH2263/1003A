@@ -982,6 +982,14 @@ def book_list_remove_book(request, list_pk, book_pk):
     return JsonResponse({'success': True})
 
 @login_required
+@require_POST
+def remove_from_all_lists(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    user_lists = BookList.objects.filter(user=request.user)
+    BookListEntry.objects.filter(book_list__in=user_lists, book=book).delete()
+    return JsonResponse({'success': True})
+
+@login_required
 def book_list_share(request, pk):
     book_list = get_object_or_404(BookList, pk=pk, user=request.user)
     

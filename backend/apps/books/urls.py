@@ -50,6 +50,7 @@ urlpatterns = [
     path('book-lists/<int:pk>/delete/', views.book_list_delete, name='book_list_delete'),
     path('book-lists/<int:list_pk>/add/<int:book_pk>/', views.book_list_add_book, name='book_list_add_book'),
     path('book-lists/<int:list_pk>/remove/<int:book_pk>/', views.book_list_remove_book, name='book_list_remove_book'),
+    path('books/<int:pk>/remove-from-all-lists/', views.remove_from_all_lists, name='remove_from_all_lists'),
     path('book-lists/<int:pk>/share/', views.book_list_share, name='book_list_share'),
     path('shared-list/<str:token>/', views.shared_book_list, name='shared_book_list'),
 ]
