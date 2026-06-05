@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load credit_tags %}
 {% block title %}首页 - 龙猫图书{% endblock %}
 {% block page_title %}系统预览{% endblock %}
 
@@ -67,29 +68,71 @@
         </div>
     </div>
 
-    <!-- Right: Announcements -->
-    <div class="space-y-8" id="announcements">
-        <h3 class="text-2xl font-bold text-slate-800 flex items-center">
-            <i class="fas fa-bullhorn text-accent mr-3"></i>
-            系统公告
-        </h3>
-        
+    <!-- Right: Announcements & Credit Ranking -->
+    <div class="space-y-8">
+        <!-- Credit Ranking -->
         <div class="space-y-4">
-            {% for announcement in announcements %}
-            <div class="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:bg-slate-50 transition-colors">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-bold text-primary bg-indigo-50 px-2 py-1 rounded-md">公告</span>
-                    <span class="text-xs text-slate-400">{{ announcement.created_at|date:"Y-m-d" }}</span>
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center">
+                <i class="fas fa-trophy text-amber-500 mr-3"></i>
+                信用排行榜
+            </h3>
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                {% for user in credit_ranking %}
+                <div class="flex items-center justify-between px-5 py-4 {% if not forloop.last %}border-b border-slate-50{% endif %} hover:bg-slate-50 transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                            {% if forloop.counter == 1 %}bg-amber-100 text-amber-600
+                            {% elif forloop.counter == 2 %}bg-slate-200 text-slate-600
+                            {% elif forloop.counter == 3 %}bg-orange-100 text-orange-600
+                            {% else %}bg-slate-100 text-slate-500{% endif %}">
+                            {% if forloop.counter <= 3 %}
+                                <i class="fas fa-medal {% if forloop.counter == 1 %}text-amber-500{% elif forloop.counter == 2 %}text-slate-400{% else %}text-orange-500{% endif %}"></i>
+                            {% else %}
+                                {{ forloop.counter }}
+                            {% endif %}
+                        </div>
+                        <span class="font-bold text-slate-700">{{ user.username|mask_username }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500" style="width: {{ user.credit_score }}%"></div>
+                        </div>
+                        <span class="text-sm font-bold text-emerald-600">{{ user.credit_score }}分</span>
+                    </div>
                 </div>
-                <h5 class="font-bold text-slate-800 mb-2">{{ announcement.title }}</h5>
-                <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">{{ announcement.content }}</p>
+                {% empty %}
+                <div class="p-8 text-center">
+                    <i class="fas fa-users text-slate-200 text-4xl mb-4"></i>
+                    <p class="text-slate-400 text-sm">暂无排名数据</p>
+                </div>
+                {% endfor %}
             </div>
-            {% empty %}
-            <div class="p-8 text-center bg-white rounded-2xl border border-slate-100">
-                <i class="fas fa-comment-slash text-slate-200 text-4xl mb-4"></i>
-                <p class="text-slate-400 text-sm">暂无最新公告</p>
+        </div>
+
+        <!-- Announcements -->
+        <div class="space-y-8" id="announcements">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center">
+                <i class="fas fa-bullhorn text-accent mr-3"></i>
+                系统公告
+            </h3>
+            
+            <div class="space-y-4">
+                {% for announcement in announcements %}
+                <div class="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:bg-slate-50 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-primary bg-indigo-50 px-2 py-1 rounded-md">公告</span>
+                        <span class="text-xs text-slate-400">{{ announcement.created_at|date:"Y-m-d" }}</span>
+                    </div>
+                    <h5 class="font-bold text-slate-800 mb-2">{{ announcement.title }}</h5>
+                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">{{ announcement.content }}</p>
+                </div>
+                {% empty %}
+                <div class="p-8 text-center bg-white rounded-2xl border border-slate-100">
+                    <i class="fas fa-comment-slash text-slate-200 text-4xl mb-4"></i>
+                    <p class="text-slate-400 text-sm">暂无最新公告</p>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
     </div>
 </div>

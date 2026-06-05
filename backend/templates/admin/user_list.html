@@ -14,6 +14,7 @@
                     <th class="px-6 py-4">用户</th>
                     <th class="px-6 py-4">角色</th>
                     <th class="px-6 py-4">电话</th>
+                    <th class="px-6 py-4">信用分</th>
                     <th class="px-6 py-4">加入时间</th>
                     <th class="px-6 py-4">状态</th>
                     <th class="px-6 py-4 text-center">操作</th>
@@ -36,6 +37,14 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 text-sm text-slate-500">{{ user.phone|default:"-" }}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="h-full {% if user.credit_score >= 80 %}bg-emerald-500{% elif user.credit_score >= 60 %}bg-amber-500{% else %}bg-red-500{% endif %}" style="width: {{ user.credit_score }}%"></div>
+                            </div>
+                            <span class="font-bold text-sm {% if user.credit_score >= 80 %}text-emerald-600{% elif user.credit_score >= 60 %}text-amber-600{% else %}text-red-600{% endif %}">{{ user.credit_score }}</span>
+                        </div>
+                    </td>
                     <td class="px-6 py-4 text-sm text-slate-500">{{ user.date_joined|date:"Y-m-d" }}</td>
                     <td class="px-6 py-4">
                         {% if user.is_active %}
@@ -49,12 +58,14 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 text-center space-x-2">
-                        <!-- Edit Button (Triggers Modal) -->
                         <button onclick="openEditModal('{{ user.pk }}', '{{ user.username }}', '{{ user.phone|default:'' }}', '{{ user.role }}')" class="p-2 text-slate-400 hover:text-primary transition-colors" title="编辑">
                             <i class="fas fa-edit"></i>
                         </button>
-                        
-                        <!-- Toggle Status Button -->
+                        {% if user.role == 'reader' %}
+                        <button onclick="openCreditModal('{{ user.pk }}', '{{ user.username }}', '{{ user.credit_score }}')" class="p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="调整信用分">
+                            <i class="fas fa-coins"></i>
+                        </button>
+                        {% endif %}
                         {% if not user.is_superuser %}
                         <form action="{% url 'user_toggle_status' user.pk %}" method="post" class="inline">
                             {% csrf_token %}
@@ -102,22 +113,52 @@
     </div>
 </div>
 
+<!-- Credit Adjust Modal -->
+<div id="creditModal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 transform scale-95 transition-transform duration-300" id="creditModalContent">
+        <h3 class="text-xl font-bold text-slate-800 mb-2">调整信用分</h3>
+        <p class="text-sm text-slate-500 mb-6">用户: <span id="creditModalUsername" class="font-bold text-slate-800"></span> | 当前信用分: <span id="creditModalCurrentScore" class="font-bold text-indigo-600"></span></p>
+        <form id="creditForm" method="post" action="">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">调整方式</label>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="setCreditType('add')" id="creditBtnAdd" class="flex-1 py-3 bg-emerald-50 text-emerald-600 font-bold rounded-xl border-2 border-emerald-500">加分</button>
+                        <button type="button" onclick="setCreditType('subtract')" id="creditBtnSub" class="flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl border-2 border-transparent">扣分</button>
+                    </div>
+                    <input type="hidden" name="action_type" id="creditActionType" value="add">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">分数</label>
+                    <input type="number" name="points" min="1" max="100" value="10" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-center text-2xl font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">调整原因</label>
+                    <textarea name="reason" rows="2" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="请输入调整原因..."></textarea>
+                </div>
+            </div>
+            <div class="mt-8 flex space-x-4">
+                <button type="button" onclick="closeCreditModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">取消</button>
+                <button type="submit" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">确认调整</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function openEditModal(pk, username, phone, role) {
         const modal = document.getElementById('editUserModal');
         const modalContent = document.getElementById('editUserModalContent');
         const form = document.getElementById('editUserForm');
         
-        // Populate fields
         document.getElementById('modalUsername').value = username;
         document.getElementById('modalPhone').value = phone;
         document.getElementById('modalRole').value = role;
         
-        // Set Action URL directly
         form.action = `/users/${pk}/edit/`;
         
         modal.classList.remove('hidden');
-        // Small delay to allow display flow to update, then animate opacity
         setTimeout(() => {
             modal.classList.remove('opacity-0');
             modalContent.classList.remove('scale-95');
@@ -136,6 +177,53 @@
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
+    }
+
+    function openCreditModal(pk, username, currentScore) {
+        const modal = document.getElementById('creditModal');
+        const modalContent = document.getElementById('creditModalContent');
+        const form = document.getElementById('creditForm');
+        
+        document.getElementById('creditModalUsername').textContent = username;
+        document.getElementById('creditModalCurrentScore').textContent = currentScore;
+        
+        form.action = `/users/${pk}/credit/`;
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+            modalContent.classList.add('scale-100');
+        }, 10);
+    }
+
+    function closeCreditModal() {
+        const modal = document.getElementById('creditModal');
+        const modalContent = document.getElementById('creditModalContent');
+        
+        modal.classList.add('opacity-0');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+        
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    function setCreditType(type) {
+        const addBtn = document.getElementById('creditBtnAdd');
+        const subBtn = document.getElementById('creditBtnSub');
+        const actionInput = document.getElementById('creditActionType');
+        
+        actionInput.value = type;
+        
+        if (type === 'add') {
+            addBtn.className = 'flex-1 py-3 bg-emerald-50 text-emerald-600 font-bold rounded-xl border-2 border-emerald-500';
+            subBtn.className = 'flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl border-2 border-transparent';
+        } else {
+            addBtn.className = 'flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl border-2 border-transparent';
+            subBtn.className = 'flex-1 py-3 bg-red-50 text-red-600 font-bold rounded-xl border-2 border-red-500';
+        }
     }
 </script>
 {% endblock %}

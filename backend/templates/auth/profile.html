@@ -35,6 +35,16 @@
                             <span class="text-slate-800 font-bold font-mono">{{ user.username }}</span>
                         </div>
                         
+                        <div class="flex justify-between p-4 bg-slate-50 rounded-2xl">
+                            <span class="text-slate-500 text-sm">信用积分</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-24 h-3 bg-slate-200 rounded-full overflow-hidden">
+                                    <div class="h-full {% if user.credit_score >= 80 %}bg-emerald-500{% elif user.credit_score >= 60 %}bg-amber-500{% else %}bg-red-500{% endif %}" style="width: {{ user.credit_score }}%"></div>
+                                </div>
+                                <span class="font-bold {% if user.credit_score >= 80 %}text-emerald-600{% elif user.credit_score >= 60 %}text-amber-600{% else %}text-red-600{% endif %}">{{ user.credit_score }}分</span>
+                            </div>
+                        </div>
+                        
                         <!-- Info Update Form -->
                         <form method="post" action="{% url 'profile' %}" class=" bg-slate-50 rounded-2xl p-4">
                             {% csrf_token %}

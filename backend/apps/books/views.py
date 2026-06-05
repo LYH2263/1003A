@@ -5,7 +5,7 @@ from django.db.models import Count, Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from .models import Book, LoanRecord, Announcement, Category, SiteConfig
-from apps.users.models import User
+from apps.users.models import User, CreditLog
 from datetime import date, timedelta
 from django.utils import timezone
 
@@ -205,11 +205,14 @@ def borrow_request(request, pk):
         messages.error(request, "该图书目前无库存，无法借阅。")
         return redirect('book_detail', pk=pk)
         
+    if not request.user.can_borrow():
+        messages.error(request, f"信用不足，暂停借阅。当前信用分：{request.user.credit_score}，需≥60分方可借阅。")
+        return redirect('book_detail', pk=pk)
+        
     if LoanRecord.objects.filter(user=request.user, book=book, status__in=['pending', 'borrowed']).exists():
         messages.warning(request, "您已申请或正在借阅此书，请勿重复操作。")
         return redirect('book_detail', pk=pk)
         
-    # Create request
     LoanRecord.objects.create(
         user=request.user,
         book=book,
@@ -256,7 +259,26 @@ def audit_loan(request, pk, action):
         loan.book.stock += 1
         loan.book.save()
         loan.save()
-        messages.success(request, "图书已成功归还。")
+        
+        days_diff = (loan.due_date - loan.return_date).days
+        if days_diff >= 7:
+            points = 3
+            log_type = 'return_early'
+            reason = f'提前归还《{loan.book.title}》，提前{days_diff}天'
+        elif days_diff >= 0:
+            points = 1
+            log_type = 'return_on_time'
+            reason = f'按时归还《{loan.book.title}》'
+        else:
+            late_days = abs(days_diff)
+            points = -(late_days * 2)
+            log_type = 'return_late'
+            reason = f'逾期归还《{loan.book.title}》，逾期{late_days}天'
+        
+        loan.user.update_credit(points, reason, request.user)
+        CreditLog.objects.filter(user=loan.user, reason=reason).update(log_type=log_type)
+        
+        messages.success(request, f"图书已成功归还。信用分{points:+d}分，当前信用分：{loan.user.credit_score}")
         
     return redirect('loan_manage')
     
@@ -268,7 +290,6 @@ def system_settings(request):
     config = SiteConfig.get_solo()
     
     if request.method == 'POST':
-        # ... (Keep existing logic)
         action = request.POST.get('action')
         if action == 'update_config':
             config.site_title = request.POST.get('site_title')
@@ -283,7 +304,14 @@ def system_settings(request):
             return redirect('system_settings')
             
     announcements = Announcement.objects.all().order_by('-created_at')
-    return render(request, 'admin/settings.html', {'announcements': announcements, 'config': config})
+    
+    credit_logs = CreditLog.objects.all().select_related('user', 'operator').order_by('-created_at')[:50]
+    
+    return render(request, 'admin/settings.html', {
+        'announcements': announcements, 
+        'config': config,
+        'credit_logs': credit_logs
+    })
 
 @login_required
 def announcement_delete(request, pk):
@@ -297,13 +325,16 @@ def announcement_delete(request, pk):
 def announcement_create(request):
     return redirect('system_settings')
     
-# Helper function
-def home(request): # Re-definition at the end to catch all context? No, just ensuring clean file content in write_to_file
+def home(request):
     announcements = Announcement.objects.filter(is_active=True).order_by('-created_at')[:5]
     latest_books = Book.objects.all().order_by('-created_at')[:8]
     config = SiteConfig.get_solo()
+    
+    credit_ranking = User.objects.filter(role='reader', is_active=True).order_by('-credit_score')[:10]
+    
     return render(request, 'books/home.html', {
         'announcements': announcements,
         'latest_books': latest_books,
-        'config': config
+        'config': config,
+        'credit_ranking': credit_ranking
     })

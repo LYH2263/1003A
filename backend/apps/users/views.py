@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .models import User
+from .models import User, CreditLog
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -123,7 +123,29 @@ def user_edit(request, pk):
         messages.success(request, f"用户 {user.username} 信息已更新。")
         return redirect('user_manage')
         
-    # Ideally should render a separate template or use a modal, 
-    # but for simplicity we might just redirect or handle it via a modal on the list page.
-    # Here assuming a separate simple edit page or returning to list if handled by modal logic.
-    return redirect('user_manage') 
+    return redirect('user_manage')
+
+@login_required
+def user_adjust_credit(request, pk):
+    if request.user.role != 'admin':
+        return redirect('home')
+    
+    user = get_object_or_404(User, pk=pk)
+    
+    if request.method == 'POST':
+        action_type = request.POST.get('action_type')
+        points = int(request.POST.get('points', 0))
+        reason = request.POST.get('reason', '')
+        
+        if action_type == 'subtract':
+            points = -points
+            log_type = 'manual_subtract'
+        else:
+            log_type = 'manual_add'
+        
+        user.update_credit(points, reason, request.user)
+        CreditLog.objects.filter(user=user, reason=reason).update(log_type=log_type)
+        
+        messages.success(request, f"已为用户 {user.username} 调整信用分 {points:+d} 分，当前信用分：{user.credit_score}")
+    
+    return redirect('user_manage')
