@@ -185,3 +185,50 @@ class ReviewReply(models.Model):
     
     def __str__(self):
         return f"{self.user.username} 回复 {self.review.user.username}"
+
+class BookList(models.Model):
+    VISIBILITY_CHOICES = (
+        ('private', '私密'),
+        ('public', '公开'),
+    )
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='book_lists', verbose_name='创建者')
+    name = models.CharField(max_length=100, verbose_name='书单名称')
+    description = models.TextField(blank=True, max_length=500, verbose_name='简短描述')
+    visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='private', verbose_name='可见性')
+    share_token = models.CharField(max_length=32, unique=True, null=True, blank=True, verbose_name='分享令牌')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = '书单'
+        verbose_name_plural = verbose_name
+        unique_together = ['user', 'name']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"
+    
+    def book_count(self):
+        return self.entries.count()
+    
+    def generate_share_token(self):
+        import uuid
+        if not self.share_token:
+            self.share_token = uuid.uuid4().hex
+            self.save()
+        return self.share_token
+
+class BookListEntry(models.Model):
+    book_list = models.ForeignKey(BookList, on_delete=models.CASCADE, related_name='entries', verbose_name='所属书单')
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='list_entries', verbose_name='图书')
+    added_at = models.DateTimeField(auto_now_add=True, verbose_name='添加时间')
+    
+    class Meta:
+        ordering = ['-added_at']
+        verbose_name = '书单条目'
+        verbose_name_plural = verbose_name
+        unique_together = ['book_list', 'book']
+    
+    def __str__(self):
+        return f"{self.book_list.name} - {self.book.title}"

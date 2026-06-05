@@ -39,4 +39,16 @@ urlpatterns = [
     path('settings/', views.system_settings, name='system_settings'),
     path('settings/announcements/create/', views.announcement_create, name='announcement_create'),
     path('settings/announcements/<int:pk>/delete/', views.announcement_delete, name='announcement_delete'),
+    
+    # Book List / Favorites System
+    path('books/<int:pk>/toggle-favorite/', views.toggle_favorite, name='toggle_favorite'),
+    path('books/<int:pk>/check-favorite/', views.check_favorite, name='check_favorite'),
+    path('my-book-lists/', views.my_book_lists, name='my_book_lists'),
+    path('book-lists/create/', views.book_list_create, name='book_list_create'),
+    path('book-lists/<int:pk>/edit/', views.book_list_edit, name='book_list_edit'),
+    path('book-lists/<int:pk>/delete/', views.book_list_delete, name='book_list_delete'),
+    path('book-lists/<int:list_pk>/add/<int:book_pk>/', views.book_list_add_book, name='book_list_add_book'),
+    path('book-lists/<int:list_pk>/remove/<int:book_pk>/', views.book_list_remove_book, name='book_list_remove_book'),
+    path('book-lists/<int:pk>/share/', views.book_list_share, name='book_list_share'),
+    path('shared-list/<str:token>/', views.shared_book_list, name='shared_book_list'),
 ]

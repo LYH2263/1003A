@@ -31,6 +31,11 @@
             <div class="absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur-md rounded-lg text-[10px] font-black text-slate-800 uppercase tracking-tighter">
                 {{ book.category.name }}
             </div>
+            {% if user.is_authenticated %}
+            <button onclick="event.preventDefault(); toggleFavorite({{ book.pk }}, this)" class="favorite-btn absolute bottom-4 right-4 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-md rounded-full shadow-lg transition-all hover:scale-110" data-book-id="{{ book.pk }}">
+                <i class="far fa-heart text-slate-400"></i>
+            </button>
+            {% endif %}
         </div>
         <h4 class="font-black text-slate-900 leading-tight mb-2 line-clamp-1 italic">{{ book.title }}</h4>
         <p class="text-xs text-slate-400 font-medium mb-2">{{ book.author }}</p>
@@ -60,5 +65,69 @@
 <style>
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .favorite-btn.active i { color: #ef4444; }
+    .favorite-btn.active i.far { display: none; }
+    .favorite-btn.active i.fas { display: inline; }
 </style>
+
+<script>
+function toggleFavorite(bookId, button) {
+    fetch(`/books/${bookId}/toggle-favorite/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateFavoriteButton(button, data.is_favorited);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function updateFavoriteButton(button, isFavorited) {
+    const icon = button.querySelector('i');
+    if (isFavorited) {
+        button.classList.add('active');
+        icon.classList.remove('far');
+        icon.classList.add('fas');
+        icon.style.color = '#ef4444';
+    } else {
+        button.classList.remove('active');
+        icon.classList.remove('fas');
+        icon.classList.add('far');
+        icon.style.color = '#94a3b8';
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const favoriteButtons = document.querySelectorAll('.favorite-btn');
+    favoriteButtons.forEach(button => {
+        const bookId = button.dataset.bookId;
+        fetch(`/books/${bookId}/check-favorite/`)
+        .then(response => response.json())
+        .then(data => {
+            updateFavoriteButton(button, data.is_favorited);
+        });
+    });
+});
+</script>
 {% endblock %}

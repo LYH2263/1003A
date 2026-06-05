@@ -4,10 +4,14 @@ from django.contrib import messages
 from django.db.models import Count, Q, Avg
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation, Review, ReviewReply
+from django.views.decorators.http import require_POST
+from django.utils.crypto import get_random_string
+from .models import Book, LoanRecord, Announcement, Category, SiteConfig, Reservation, Review, ReviewReply, BookList, BookListEntry
 from apps.users.models import User, CreditLog
 from datetime import date, timedelta
 from django.utils import timezone
+import uuid
+import json
 
 # ... (Previous simple views: home, admin_dashboard)
 
@@ -673,4 +677,188 @@ def home(request):
         'config': config,
         'credit_ranking': credit_ranking,
         'user_notifications': user_notifications
+    })
+
+@login_required
+@require_POST
+def toggle_favorite(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    favorites_list, created = BookList.objects.get_or_create(
+        user=request.user,
+        name='我的收藏',
+        defaults={'description': '默认收藏夹', 'visibility': 'private'}
+    )
+    
+    entry = BookListEntry.objects.filter(book_list=favorites_list, book=book).first()
+    if entry:
+        entry.delete()
+        is_favorited = False
+    else:
+        BookListEntry.objects.create(book_list=favorites_list, book=book)
+        is_favorited = True
+    
+    favorite_count = BookListEntry.objects.filter(book=book).count()
+    
+    return JsonResponse({
+        'success': True,
+        'is_favorited': is_favorited,
+        'favorite_count': favorite_count
+    })
+
+@login_required
+def check_favorite(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    favorites_list = BookList.objects.filter(user=request.user, name='我的收藏').first()
+    is_favorited = False
+    if favorites_list:
+        is_favorited = BookListEntry.objects.filter(book_list=favorites_list, book=book).exists()
+    
+    favorite_count = BookListEntry.objects.filter(book=book).count()
+    
+    return JsonResponse({
+        'is_favorited': is_favorited,
+        'favorite_count': favorite_count
+    })
+
+@login_required
+def my_book_lists(request):
+    book_lists = BookList.objects.filter(user=request.user).annotate(
+        book_count=Count('entries')
+    )
+    
+    all_favorited_books = Book.objects.filter(
+        list_entries__book_list__user=request.user
+    ).distinct().annotate(
+        avg_rating=Avg('reviews__rating'),
+        review_count=Count('reviews')
+    )
+    
+    book_list_assignments = {}
+    for book in all_favorited_books:
+        book_list_assignments[book.id] = list(
+            BookList.objects.filter(
+                user=request.user,
+                entries__book=book
+            ).values_list('id', 'name')
+        )
+    
+    return render(request, 'user/my_book_lists.html', {
+        'book_lists': book_lists,
+        'all_favorited_books': all_favorited_books,
+        'book_list_assignments': book_list_assignments,
+        'book_list_assignments_json': json.dumps(book_list_assignments)
+    })
+
+@login_required
+@require_POST
+def book_list_create(request):
+    name = request.POST.get('name', '').strip()
+    description = request.POST.get('description', '').strip()
+    
+    if not name:
+        messages.error(request, '书单名称不能为空。')
+        return redirect('my_book_lists')
+    
+    if BookList.objects.filter(user=request.user, name=name).exists():
+        messages.error(request, '您已存在同名书单。')
+        return redirect('my_book_lists')
+    
+    BookList.objects.create(
+        user=request.user,
+        name=name,
+        description=description
+    )
+    
+    messages.success(request, f'书单"{name}"创建成功！')
+    return redirect('my_book_lists')
+
+@login_required
+@require_POST
+def book_list_edit(request, pk):
+    book_list = get_object_or_404(BookList, pk=pk, user=request.user)
+    
+    name = request.POST.get('name', '').strip()
+    description = request.POST.get('description', '').strip()
+    visibility = request.POST.get('visibility', 'private')
+    
+    if not name:
+        messages.error(request, '书单名称不能为空。')
+        return redirect('my_book_lists')
+    
+    if name != book_list.name and BookList.objects.filter(user=request.user, name=name).exists():
+        messages.error(request, '您已存在同名书单。')
+        return redirect('my_book_lists')
+    
+    book_list.name = name
+    book_list.description = description
+    book_list.visibility = visibility
+    book_list.save()
+    
+    messages.success(request, f'书单"{name}"更新成功！')
+    return redirect('my_book_lists')
+
+@login_required
+@require_POST
+def book_list_delete(request, pk):
+    book_list = get_object_or_404(BookList, pk=pk, user=request.user)
+    
+    if book_list.name == '我的收藏':
+        messages.error(request, '默认收藏夹不能删除。')
+        return redirect('my_book_lists')
+    
+    book_list.delete()
+    messages.success(request, f'书单"{book_list.name}"已删除。')
+    return redirect('my_book_lists')
+
+@login_required
+@require_POST
+def book_list_add_book(request, list_pk, book_pk):
+    book_list = get_object_or_404(BookList, pk=list_pk, user=request.user)
+    book = get_object_or_404(Book, pk=book_pk)
+    
+    if BookListEntry.objects.filter(book_list=book_list, book=book).exists():
+        return JsonResponse({'success': False, 'message': '该书已在此书单中'})
+    
+    BookListEntry.objects.create(book_list=book_list, book=book)
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def book_list_remove_book(request, list_pk, book_pk):
+    book_list = get_object_or_404(BookList, pk=list_pk, user=request.user)
+    entry = get_object_or_404(BookListEntry, book_list=book_list, book_id=book_pk)
+    entry.delete()
+    return JsonResponse({'success': True})
+
+@login_required
+def book_list_share(request, pk):
+    book_list = get_object_or_404(BookList, pk=pk, user=request.user)
+    
+    if book_list.visibility != 'public':
+        book_list.visibility = 'public'
+        book_list.save()
+    
+    share_token = book_list.generate_share_token()
+    share_url = request.build_absolute_uri(f'/shared-list/{share_token}/')
+    
+    return JsonResponse({
+        'success': True,
+        'share_url': share_url,
+        'share_token': share_token
+    })
+
+def shared_book_list(request, token):
+    book_list = get_object_or_404(BookList, share_token=token, visibility='public')
+    
+    books = Book.objects.filter(
+        list_entries__book_list=book_list
+    ).annotate(
+        avg_rating=Avg('reviews__rating'),
+        review_count=Count('reviews')
+    ).order_by('-list_entries__added_at')
+    
+    return render(request, 'books/shared_list.html', {
+        'book_list': book_list,
+        'books': books,
+        'owner': book_list.user
     })

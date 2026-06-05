@@ -1,0 +1,434 @@
+{% extends 'base.html' %}
+{% load book_list_tags %}
+{% block title %}我的书单 - 龙猫图书{% endblock %}
+{% block page_title %}我的书单{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-800">管理您的书单</h2>
+            <p class="text-slate-500 mt-1">创建书单，分类整理您喜爱的图书</p>
+        </div>
+        <button onclick="openCreateModal()" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all hover:scale-[1.02] active:scale-95 flex items-center">
+            <i class="fas fa-plus mr-2"></i> 创建新书单
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-1 space-y-4">
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-100 p-6 border border-slate-50">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center">
+                    <i class="fas fa-folder text-indigo-500 mr-2"></i> 我的书单
+                </h3>
+                <div class="space-y-2">
+                    {% for book_list in book_lists %}
+                    <div class="book-list-item p-4 rounded-2xl border-2 transition-all cursor-pointer {% if forloop.first %}border-indigo-500 bg-indigo-50{% else %}border-slate-100 hover:border-indigo-200{% endif %}" 
+                         onclick="selectBookList({{ book_list.id }}, this)" 
+                         data-list-id="{{ book_list.id }}"
+                         data-list-name="{{ book_list.name }}"
+                         data-list-desc="{{ book_list.description }}"
+                         data-list-visibility="{{ book_list.visibility }}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl {% if book_list.name == '我的收藏' %}bg-red-100 text-red-500{% else %}bg-indigo-100 text-indigo-500{% endif %} flex items-center justify-center">
+                                    <i class="fas {% if book_list.name == '我的收藏' %}fa-heart{% else %}fa-book{% endif %}"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800">{{ book_list.name }}</h4>
+                                    <p class="text-xs text-slate-400">{{ book_list.book_count }} 本图书</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                {% if book_list.visibility == 'public' %}
+                                <span class="text-emerald-500 text-xs"><i class="fas fa-globe"></i></span>
+                                {% endif %}
+                                <button onclick="event.stopPropagation(); showListActions({{ book_list.id }}, '{{ book_list.name }}', '{{ book_list.visibility }}')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-8 text-slate-400">
+                        <i class="fas fa-folder-open text-4xl mb-3"></i>
+                        <p>暂无书单</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-100 p-8 border border-slate-50">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="font-bold text-slate-800 text-lg">
+                        <i class="fas fa-heart text-red-500 mr-2"></i> 所有收藏图书
+                    </h3>
+                    <span class="text-sm text-slate-400">{{ all_favorited_books.count }} 本图书</span>
+                </div>
+                
+                {% if all_favorited_books %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for book in all_favorited_books %}
+                    <div class="flex items-start space-x-4 p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors group">
+                        <a href="{% url 'book_detail' book.pk %}" class="shrink-0">
+                            <div class="w-16 h-20 rounded-lg overflow-hidden bg-slate-200">
+                                {% if book.cover %}
+                                <img src="{{ book.cover.url }}" class="w-full h-full object-cover">
+                                {% else %}
+                                <div class="w-full h-full flex items-center justify-center text-slate-400">
+                                    <i class="fas fa-book"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </a>
+                        <div class="flex-1 min-w-0">
+                            <a href="{% url 'book_detail' book.pk %}" class="font-bold text-slate-800 hover:text-indigo-600 transition-colors line-clamp-1">{{ book.title }}</a>
+                            <p class="text-sm text-slate-400 mt-1">{{ book.author }}</p>
+                            <div class="flex items-center mt-2">
+                                <div class="flex items-center">
+                                    <i class="fas fa-star text-amber-400 text-xs"></i>
+                                    <span class="text-xs font-bold text-slate-700 ml-1">{{ book.avg_rating|default:"0.0"|floatformat:1 }}</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                {% for list_id, list_name in book_list_assignments|get_item:book.id %}
+                                <span class="inline-flex items-center px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full">
+                                    {{ list_name }}
+                                    <button onclick="event.preventDefault(); removeBookFromList({{ list_id }}, {{ book.id }}, this)" class="ml-1 hover:text-indigo-800">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openAddToListModal({{ book.id }})" class="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors" title="添加到书单">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button onclick="removeFromAllLists({{ book.id }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="从所有书单移除">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-16">
+                    <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-heart text-slate-300 text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">暂无收藏</h3>
+                    <p class="text-slate-500 mb-6">去发现页收藏您喜爱的图书吧！</p>
+                    <a href="{% url 'book_browse' %}" class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all">
+                        <i class="fas fa-search mr-2"></i> 浏览图书
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="create-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-900" id="modal-title">创建新书单</h3>
+                <button onclick="closeModal('create-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="list-form" method="post" action="{% url 'book_list_create' %}">
+                {% csrf_token %}
+                <input type="hidden" id="list-id" name="list_id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-600 mb-2">书单名称</label>
+                        <input type="text" id="list-name" name="name" required maxlength="100"
+                            class="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="如：寒假必读、技术提升">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-600 mb-2">简短描述</label>
+                        <textarea id="list-desc" name="description" rows="3" maxlength="500"
+                            class="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                            placeholder="简单描述这个书单的内容..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-600 mb-2">可见性</label>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="visibility" value="private" id="vis-private" checked class="w-4 h-4 text-indigo-600">
+                                <span class="text-slate-700">私密</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="visibility" value="public" id="vis-public" class="w-4 h-4 text-indigo-600">
+                                <span class="text-slate-700">公开</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex space-x-3">
+                    <button type="button" onclick="closeModal('create-modal')" class="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                        取消
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="add-to-list-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-900">添加到书单</h3>
+                <button onclick="closeModal('add-to-list-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <input type="hidden" id="add-book-id">
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+                {% for book_list in book_lists %}
+                <label class="flex items-center p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 cursor-pointer transition-colors">
+                    <input type="checkbox" class="list-checkbox w-4 h-4 text-indigo-600 rounded" value="{{ book_list.id }}" onchange="toggleBookInList({{ book_list.id }}, this)">
+                    <div class="ml-3">
+                        <div class="font-bold text-slate-800">{{ book_list.name }}</div>
+                        <div class="text-xs text-slate-400">{{ book_list.book_count }} 本图书</div>
+                    </div>
+                </label>
+                {% empty %}
+                <p class="text-center text-slate-400 py-8">暂无书单，请先创建</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="share-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-900">分享书单</h3>
+                <button onclick="closeModal('share-modal')" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-500">
+                            <i class="fas fa-globe"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-emerald-700">书单已设为公开</h4>
+                            <p class="text-sm text-emerald-600">其他用户可通过链接查看</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-600 mb-2">分享链接</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="share-url" readonly
+                            class="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600">
+                        <button onclick="copyShareUrl()" class="px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('modal-title').textContent = '创建新书单';
+    document.getElementById('list-form').action = '{% url "book_list_create" %}';
+    document.getElementById('list-id').value = '';
+    document.getElementById('list-name').value = '';
+    document.getElementById('list-desc').value = '';
+    document.getElementById('vis-private').checked = true;
+    document.getElementById('create-modal').classList.remove('hidden');
+}
+
+function openEditModal(listId, name, desc, visibility) {
+    document.getElementById('modal-title').textContent = '编辑书单';
+    document.getElementById('list-form').action = `/book-lists/${listId}/edit/`;
+    document.getElementById('list-id').value = listId;
+    document.getElementById('list-name').value = name;
+    document.getElementById('list-desc').value = desc;
+    document.getElementById(`vis-${visibility}`).checked = true;
+    document.getElementById('create-modal').classList.remove('hidden');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+}
+
+function selectBookList(listId, element) {
+    document.querySelectorAll('.book-list-item').forEach(item => {
+        item.classList.remove('border-indigo-500', 'bg-indigo-50');
+        item.classList.add('border-slate-100');
+    });
+    element.classList.remove('border-slate-100');
+    element.classList.add('border-indigo-500', 'bg-indigo-50');
+}
+
+function showListActions(listId, listName, visibility) {
+    const actions = [
+        { label: '编辑', icon: 'fa-edit', action: () => openEditModal(listId, listName, document.querySelector(`[data-list-id="${listId}"]`).dataset.listDesc, visibility) },
+        { label: '分享', icon: 'fa-share-alt', action: () => shareBookList(listId) },
+        { label: '删除', icon: 'fa-trash', action: () => deleteBookList(listId, listName), danger: true }
+    ];
+    
+    if (listName === '我的收藏') {
+        actions.pop();
+    }
+    
+    const menu = document.createElement('div');
+    menu.className = 'fixed z-[200] bg-white rounded-2xl shadow-2xl p-2 min-w-[150px] border border-slate-100';
+    menu.style.top = event.clientY + 'px';
+    menu.style.left = event.clientX + 'px';
+    
+    actions.forEach(a => {
+        const btn = document.createElement('button');
+        btn.className = `w-full text-left px-4 py-2 rounded-xl text-sm font-medium transition-colors ${a.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`;
+        btn.innerHTML = `<i class="fas ${a.icon} mr-2"></i> ${a.label}`;
+        btn.onclick = () => { menu.remove(); a.action(); };
+        menu.appendChild(btn);
+    });
+    
+    document.body.appendChild(menu);
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }, 0);
+}
+
+function shareBookList(listId) {
+    fetch(`/book-lists/${listId}/share/`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('share-url').value = data.share_url;
+            document.getElementById('share-modal').classList.remove('hidden');
+        }
+    });
+}
+
+function copyShareUrl() {
+    const input = document.getElementById('share-url');
+    input.select();
+    document.execCommand('copy');
+    
+    const btn = input.nextElementSibling;
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i>';
+    btn.classList.add('bg-emerald-500');
+    setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.classList.remove('bg-emerald-500');
+    }, 1500);
+}
+
+function deleteBookList(listId, listName) {
+    if (confirm(`确定要删除书单"${listName}"吗？书单中的图书将被移出，但不会从"我的收藏"中删除。`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/book-lists/${listId}/delete/`;
+        form.innerHTML = '{% csrf_token %}';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function openAddToListModal(bookId) {
+    document.getElementById('add-book-id').value = bookId;
+    
+    document.querySelectorAll('.list-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    const assignments = {{ book_list_assignments_json|safe }};
+    if (assignments[bookId]) {
+        assignments[bookId].forEach(([listId, name]) => {
+            const checkbox = document.querySelector(`.list-checkbox[value="${listId}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+    }
+    
+    document.getElementById('add-to-list-modal').classList.remove('hidden');
+}
+
+function toggleBookInList(listId, checkbox) {
+    const bookId = document.getElementById('add-book-id').value;
+    const url = checkbox.checked 
+        ? `/book-lists/${listId}/add/${bookId}/`
+        : `/book-lists/${listId}/remove/${bookId}/`;
+    
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+function removeBookFromList(listId, bookId, element) {
+    fetch(`/book-lists/${listId}/remove/${bookId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+function removeFromAllLists(bookId) {
+    if (confirm('确定要将这本书从所有书单中移除吗？')) {
+        fetch(`/books/${bookId}/toggle-favorite/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

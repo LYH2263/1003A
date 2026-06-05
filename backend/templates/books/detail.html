@@ -46,6 +46,8 @@
                     </div>
                     <span class="text-slate-400">|</span>
                     <span class="text-slate-500"><i class="fas fa-comments mr-1"></i> {{ rating_info.review_count }} 条评论</span>
+                    <span class="text-slate-400">|</span>
+                    <span class="text-slate-500"><i class="fas fa-heart mr-1"></i> <span id="favorite-count">0</span> 人收藏</span>
                 </div>
             </div>
 
@@ -90,6 +92,11 @@
                             <i class="fas fa-user-plus mr-2"></i> 加入预约队列
                         </a>
                     {% endif %}
+                {% endif %}
+                {% if user.is_authenticated %}
+                <button id="detail-favorite-btn" onclick="toggleDetailFavorite({{ book.pk }})" class="px-8 py-4 border-2 border-red-200 text-red-500 font-bold rounded-2xl hover:bg-red-50 transition-all flex items-center justify-center">
+                    <i class="far fa-heart mr-2"></i> <span class="btn-text">收藏</span>
+                </button>
                 {% endif %}
                 <button onclick="history.back()" class="px-8 py-4 border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all">
                     返回列表
@@ -257,6 +264,57 @@ function confirmDeleteReview(reviewId) {
     }
 }
 
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function toggleDetailFavorite(bookId) {
+    fetch(`/books/${bookId}/toggle-favorite/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateDetailFavoriteButton(data.is_favorited);
+            document.getElementById('favorite-count').textContent = data.favorite_count;
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function updateDetailFavoriteButton(isFavorited) {
+    const button = document.getElementById('detail-favorite-btn');
+    const icon = button.querySelector('i');
+    const btnText = button.querySelector('.btn-text');
+    
+    if (isFavorited) {
+        icon.classList.remove('far');
+        icon.classList.add('fas');
+        btnText.textContent = '已收藏';
+        button.classList.add('bg-red-50');
+    } else {
+        icon.classList.remove('fas');
+        icon.classList.add('far');
+        btnText.textContent = '收藏';
+        button.classList.remove('bg-red-50');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const starLabels = document.querySelectorAll('.star-rating label');
     starLabels.forEach(label => {
@@ -300,6 +358,17 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    const favoriteBtn = document.getElementById('detail-favorite-btn');
+    if (favoriteBtn) {
+        const bookId = {{ book.pk }};
+        fetch(`/books/${bookId}/check-favorite/`)
+        .then(response => response.json())
+        .then(data => {
+            updateDetailFavoriteButton(data.is_favorited);
+            document.getElementById('favorite-count').textContent = data.favorite_count;
+        });
+    }
 });
 </script>
 {% endblock %}
