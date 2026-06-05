@@ -367,8 +367,8 @@ def review_delete(request, pk):
     review = get_object_or_404(Review, pk=pk)
     book_pk = review.book.pk
     
-    if request.user.role != 'admin':
-        messages.error(request, "只有管理员可以删除评论。")
+    if request.user.role != 'admin' and review.user != request.user:
+        messages.error(request, "您无权删除这条评论。")
         return redirect('book_detail', pk=book_pk)
     
     review.delete()
@@ -377,6 +377,8 @@ def review_delete(request, pk):
     from_param = request.GET.get('from')
     if from_param == 'manage':
         return redirect('review_manage')
+    elif from_param == 'my_reviews':
+        return redirect('my_reviews')
     return redirect('book_detail', pk=book_pk)
 
 @login_required
