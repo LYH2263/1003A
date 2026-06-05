@@ -15,12 +15,30 @@ from django.utils import timezone
 def admin_dashboard(request):
     if request.user.role != 'admin':
         return redirect('home')
-        
+    
+    from django.db.models import Sum
+    from datetime import datetime
+    
+    today = date.today()
+    first_day_of_month = today.replace(day=1)
+    
+    pending_payments = LoanRecord.objects.filter(status='pending_payment')
+    total_pending_fine = sum(loan.calculate_fine() for loan in pending_payments)
+    
+    paid_this_month = LoanRecord.objects.filter(
+        payment_date__gte=first_day_of_month,
+        fine_paid=True
+    ).aggregate(total=Sum('fine_amount'))['total'] or 0
+    
     stats = {
         'total_books': Book.objects.count(),
         'total_users': User.objects.count(),
         'active_loans': LoanRecord.objects.filter(status='borrowed').count(),
         'pending_requests': LoanRecord.objects.filter(status='pending').count(),
+        'pending_payments': pending_payments.count(),
+        'monthly_fine_total': float(paid_this_month) + total_pending_fine,
+        'monthly_fine_paid': float(paid_this_month),
+        'monthly_fine_unpaid': total_pending_fine,
     }
     
     recent_loans = LoanRecord.objects.all().order_by('-borrow_date')[:5]
@@ -305,6 +323,10 @@ def borrow_request(request, pk):
     
     check_expired_reservations()
     
+    if LoanRecord.objects.filter(user=request.user, status='pending_payment').exists():
+        messages.error(request, "您存在未缴纳的逾期罚款，请先缴费后再申请借阅。")
+        return redirect('my_loans')
+    
     if book.stock <= 0:
         messages.error(request, "该图书目前无库存，无法借阅。")
         return redirect('book_detail', pk=pk)
@@ -323,11 +345,13 @@ def borrow_request(request, pk):
         status='notified'
     ).first()
     
+    config = SiteConfig.get_solo()
     LoanRecord.objects.create(
         user=request.user,
         book=book,
         due_date=date.today() + timedelta(days=30),
-        status='pending'
+        status='pending',
+        fine_daily_rate=config.daily_fine_rate
     )
     
     if reservation:
@@ -341,12 +365,19 @@ def borrow_request(request, pk):
 def my_loans(request):
     check_expired_reservations()
     loans = LoanRecord.objects.filter(user=request.user).order_by('-borrow_date')
+    
+    loans_with_fine = []
+    for loan in loans:
+        loan.current_fine = loan.calculate_fine()
+        loan.overdue_days = loan.get_overdue_days()
+        loans_with_fine.append(loan)
+    
     reservations = Reservation.objects.filter(
         user=request.user,
         status__in=['waiting', 'notified']
     ).order_by('-created_at')
     return render(request, 'user/my_loans.html', {
-        'loans': loans,
+        'loans': loans_with_fine,
         'reservations': reservations
     })
     
@@ -377,26 +408,34 @@ def audit_loan(request, pk, action):
         loan.save()
         messages.success(request, "借阅申请已拒绝。")
     elif action == 'return':
-        loan.status = 'returned'
         loan.return_date = date.today()
         loan.book.stock += 1
         loan.book.save()
-        loan.save()
         
         days_diff = (loan.due_date - loan.return_date).days
         if days_diff >= 7:
             points = 3
             log_type = 'return_early'
             reason = f'提前归还《{loan.book.title}》，提前{days_diff}天'
+            loan.status = 'returned'
+            loan.fine_paid = True
         elif days_diff >= 0:
             points = 1
             log_type = 'return_on_time'
             reason = f'按时归还《{loan.book.title}》'
+            loan.status = 'returned'
+            loan.fine_paid = True
         else:
             late_days = abs(days_diff)
             points = -(late_days * 2)
             log_type = 'return_late'
             reason = f'逾期归还《{loan.book.title}》，逾期{late_days}天'
+            fine_amount = late_days * float(loan.fine_daily_rate)
+            loan.fine_amount = fine_amount
+            loan.status = 'pending_payment'
+            loan.fine_paid = False
+        
+        loan.save()
         
         loan.user.update_credit(points, reason, request.user)
         CreditLog.objects.filter(user=loan.user, reason=reason).update(log_type=log_type)
@@ -405,8 +444,26 @@ def audit_loan(request, pk, action):
         if notified_reservation:
             messages.info(request, f"已通知预约读者：{notified_reservation.user.username}")
         
-        messages.success(request, f"图书已成功归还。信用分{points:+d}分，当前信用分：{loan.user.credit_score}")
+        if loan.status == 'pending_payment':
+            messages.warning(request, f"图书已归还，但存在逾期罚款 ¥{loan.fine_amount:.2f}。请提醒读者缴费。")
+        else:
+            messages.success(request, f"图书已成功归还。信用分{points:+d}分，当前信用分：{loan.user.credit_score}")
         
+    return redirect('loan_manage')
+
+@login_required
+def confirm_payment(request, pk):
+    if request.user.role != 'admin':
+        return redirect('home')
+    loan = get_object_or_404(LoanRecord, pk=pk)
+    
+    if loan.status == 'pending_payment':
+        loan.status = 'returned'
+        loan.fine_paid = True
+        loan.payment_date = date.today()
+        loan.save()
+        messages.success(request, f"已确认缴费 ¥{loan.fine_amount:.2f}，借阅记录已完成。")
+    
     return redirect('loan_manage')
     
 @login_required
@@ -421,6 +478,11 @@ def system_settings(request):
         if action == 'update_config':
             config.site_title = request.POST.get('site_title')
             config.maintenance_mode = request.POST.get('maintenance_mode') == 'on'
+            daily_fine_rate = request.POST.get('daily_fine_rate', '0.5')
+            try:
+                config.daily_fine_rate = float(daily_fine_rate)
+            except ValueError:
+                config.daily_fine_rate = 0.5
             config.save()
             messages.success(request, "系统基本配置已更新。")
         elif action == 'create_announcement':

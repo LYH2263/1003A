@@ -36,6 +36,7 @@ class LoanRecord(models.Model):
         ('borrowed', '借阅中'),
         ('returned', '已归还'),
         ('rejected', '已拒绝'),
+        ('pending_payment', '待缴费'),
     )
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="借阅人")
@@ -44,11 +45,34 @@ class LoanRecord(models.Model):
     due_date = models.DateField(verbose_name="应还日期")
     return_date = models.DateField(null=True, blank=True, verbose_name="归还日期")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="状态")
+    fine_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="罚款金额")
+    fine_paid = models.BooleanField(default=False, verbose_name="罚款已缴纳")
+    fine_daily_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0.5, verbose_name="每日罚款单价")
+    payment_date = models.DateField(null=True, blank=True, verbose_name="缴费日期")
     
     class Meta:
         ordering = ['-borrow_date']
         verbose_name = "借阅记录"
         verbose_name_plural = verbose_name
+    
+    def calculate_fine(self):
+        from datetime import date
+        if self.status == 'returned' and self.fine_paid:
+            return self.fine_amount
+        if self.status in ['pending_payment', 'borrowed']:
+            today = date.today()
+            check_date = self.return_date or today
+            if check_date > self.due_date:
+                overdue_days = (check_date - self.due_date).days
+                return overdue_days * float(self.fine_daily_rate)
+        return 0
+    
+    def get_overdue_days(self):
+        from datetime import date
+        today = date.today()
+        if today > self.due_date and self.status in ['borrowed', 'pending_payment']:
+            return (today - self.due_date).days
+        return 0
 
 class Announcement(models.Model):
     title = models.CharField(max_length=100, verbose_name="标题")
@@ -62,6 +86,7 @@ class Announcement(models.Model):
 class SiteConfig(models.Model):
     site_title = models.CharField(max_length=50, default="龙猫图书管理系统", verbose_name="系统名称")
     maintenance_mode = models.BooleanField(default=False, verbose_name="维护模式")
+    daily_fine_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0.5, verbose_name="每日罚款单价(元)")
     
     def save(self, *args, **kwargs):
         # Ensure only one instance exists

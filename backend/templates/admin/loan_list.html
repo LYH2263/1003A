@@ -21,6 +21,7 @@
                     <option value="borrowed" {% if request.GET.status == 'borrowed' %}selected{% endif %}>借阅中</option>
                     <option value="returned" {% if request.GET.status == 'returned' %}selected{% endif %}>已归还</option>
                     <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>已拒绝</option>
+                    <option value="pending_payment" {% if request.GET.status == 'pending_payment' %}selected{% endif %}>待缴费</option>
                 </select>
             </div>
             
@@ -80,13 +81,21 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <span class="px-2 py-1 text-[10px] font-bold rounded-md 
-                        {% if loan.status == 'borrowed' %}bg-emerald-50 text-emerald-600
-                        {% elif loan.status == 'pending' %}bg-orange-50 text-orange-600
-                        {% elif loan.status == 'returned' %}bg-slate-50 text-slate-500
-                        {% else %}bg-red-50 text-red-500{% endif %}">
-                        {{ loan.get_status_display }}
-                        </span>
+                        <div class="flex flex-col gap-1">
+                            <span class="px-2 py-1 text-[10px] font-bold rounded-md w-fit
+                            {% if loan.status == 'borrowed' %}bg-emerald-50 text-emerald-600
+                            {% elif loan.status == 'pending' %}bg-orange-50 text-orange-600
+                            {% elif loan.status == 'returned' %}bg-slate-50 text-slate-500
+                            {% elif loan.status == 'pending_payment' %}bg-amber-50 text-amber-600
+                            {% else %}bg-red-50 text-red-500{% endif %}">
+                            {{ loan.get_status_display }}
+                            </span>
+                            {% if loan.status == 'pending_payment' %}
+                            <span class="text-[10px] text-amber-600 font-bold">
+                                待缴: ¥{{ loan.fine_amount|floatformat:2 }}
+                            </span>
+                            {% endif %}
+                        </div>
                     </td>
                     <td class="px-6 py-4 text-center">
                         {% if loan.status == 'pending' %}
@@ -100,6 +109,9 @@
                         {% elif loan.status == 'borrowed' %}
                         <button onclick="document.getElementById('return-{{ loan.id }}').submit()" class="p-1 px-3 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity">确认归还</button>
                         <form id="return-{{ loan.id }}" action="{% url 'audit_loan' loan.id 'return' %}" method="post" class="hidden">{% csrf_token %}</form>
+                        {% elif loan.status == 'pending_payment' %}
+                        <button onclick="document.getElementById('payment-{{ loan.id }}').submit()" class="p-1 px-3 bg-amber-50 text-amber-600 rounded-lg text-xs font-bold hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity">确认缴费</button>
+                        <form id="payment-{{ loan.id }}" action="{% url 'confirm_payment' loan.id %}" method="post" class="hidden">{% csrf_token %}</form>
                         {% else %}
                         <span class="text-xs text-slate-300">-</span>
                         {% endif %}

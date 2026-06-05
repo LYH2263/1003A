@@ -26,6 +26,7 @@ urlpatterns = [
     path('users/manage/', views.user_manage, name='user_manage'),
     path('loans/manage/', views.loan_manage, name='loan_manage'),
     path('loans/<int:pk>/audit/<str:action>/', views.audit_loan, name='audit_loan'),
+    path('loans/<int:pk>/confirm-payment/', views.confirm_payment, name='confirm_payment'),
     
     # System Settings
     path('settings/', views.system_settings, name='system_settings'),
