@@ -20,12 +20,17 @@ class Category(models.Model):
     
     def get_book_count(self):
         if self.is_top_level():
-            return Book.objects.filter(category__parent=self).count()
+            direct_books = self.book_set.count()
+            child_books = Book.objects.filter(category__parent=self).count()
+            return direct_books + child_books
         return self.book_set.count()
     
     def can_delete(self):
         if self.is_top_level():
-            return not self.children.exists() and not Book.objects.filter(category__parent=self).exists()
+            has_children = self.children.exists()
+            has_direct_books = self.book_set.exists()
+            has_child_books = Book.objects.filter(category__parent=self).exists()
+            return not has_children and not has_direct_books and not has_child_books
         return not self.book_set.exists()
         
     class Meta:

@@ -8,7 +8,7 @@
         <div class="flex items-center space-x-3 overflow-x-auto pb-2 -mb-2 no-scrollbar">
             <a href="?{% if query %}q={{ query }}{% endif %}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if not selected_parent and not selected_category %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">全部</a>
             {% for top_cat in top_categories %}
-            <a href="?parent_category={{ top_cat.id }}{% if query %}&q={{ query }}{% endif %}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if selected_parent == top_cat.id|stringformat:'s' %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">{{ top_cat.name }}</a>
+            <a href="?parent_category={{ top_cat.id }}{% if query %}&q={{ query }}{% endif %}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if selected_parent == top_cat.id|stringformat:'s' %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">{{ top_cat.name }} <span class="{% if selected_parent == top_cat.id|stringformat:'s' %}text-white/70{% else %}text-slate-400{% endif %}">({{ top_cat.get_book_count }})</span></a>
             {% endfor %}
         </div>
         
@@ -27,7 +27,7 @@
         {% for top_cat in top_categories %}
         {% if top_cat.id|stringformat:'s' == selected_parent %}
         {% for child in top_cat.children.all %}
-        <a href="?category={{ child.id }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all {% if selected_category == child.id|stringformat:'s' %}bg-emerald-500 text-white{% else %}bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200{% endif %}">{{ child.name }}</a>
+        <a href="?category={{ child.id }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all {% if selected_category == child.id|stringformat:'s' %}bg-emerald-500 text-white{% else %}bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200{% endif %}">{{ child.name }}({{ child.book_set.count }})</a>
         {% endfor %}
         {% endif %}
         {% endfor %}
