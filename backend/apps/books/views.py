@@ -1078,3 +1078,479 @@ def shared_book_list(request, token):
         'books': books,
         'owner': book_list.user
     })
+
+def _parse_date_range(request):
+    from datetime import datetime
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    start_date = None
+    end_date = None
+    try:
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        start_date = None
+        end_date = None
+    return start_date, end_date
+
+def _filter_loans_by_date(start_date, end_date):
+    loans = LoanRecord.objects.all()
+    if start_date:
+        loans = loans.filter(borrow_date__gte=start_date)
+    if end_date:
+        loans = loans.filter(borrow_date__lte=end_date)
+    return loans
+
+@login_required
+def dashboard_overview(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    from django.db.models import Sum, Avg, Count
+    from datetime import date, timedelta
+
+    start_date, end_date = _parse_date_range(request)
+
+    today = date.today()
+    first_day_of_month = today.replace(day=1)
+
+    loans_in_range = _filter_loans_by_date(start_date, end_date)
+    returned_loans = loans_in_range.filter(status__in=['returned', 'pending_payment'])
+
+    has_date_range = start_date is not None or end_date is not None
+
+    new_books_qs = Book.objects.all()
+    if not has_date_range:
+        new_books_qs = new_books_qs.filter(created_at__date__gte=first_day_of_month)
+    else:
+        if start_date:
+            new_books_qs = new_books_qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            new_books_qs = new_books_qs.filter(created_at__date__lte=end_date)
+    new_books_count = new_books_qs.count()
+
+    new_users_qs = User.objects.filter(role='reader')
+    if not has_date_range:
+        new_users_qs = new_users_qs.filter(created_at__date__gte=first_day_of_month)
+    else:
+        if start_date:
+            new_users_qs = new_users_qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            new_users_qs = new_users_qs.filter(created_at__date__lte=end_date)
+    new_users_count = new_users_qs.count()
+
+    total_stock = Book.objects.aggregate(total=Sum('total_stock'))['total'] or 0
+    active_loans_count = LoanRecord.objects.filter(status='borrowed').count()
+    borrow_rate = (active_loans_count / total_stock * 100) if total_stock > 0 else 0.0
+
+    avg_borrow_days = 0.0
+    durations = []
+    for loan in returned_loans:
+        if loan.return_date:
+            duration = (loan.return_date - loan.borrow_date).days
+            if duration > 0:
+                durations.append(duration)
+    if durations:
+        avg_borrow_days = round(sum(durations) / len(durations), 1)
+
+    pending_payments = LoanRecord.objects.filter(status='pending_payment')
+    total_pending_fine = sum(loan.calculate_fine() for loan in pending_payments)
+
+    stats = {
+        'total_books': Book.objects.count(),
+        'total_users': User.objects.count(),
+        'active_loans': active_loans_count,
+        'pending_requests': LoanRecord.objects.filter(status='pending').count(),
+        'new_books_count': new_books_count,
+        'new_users_count': new_users_count,
+        'borrow_rate': round(borrow_rate, 1),
+        'avg_borrow_days': avg_borrow_days,
+        'pending_payments': pending_payments.count(),
+        'monthly_fine_total': 0,
+        'monthly_fine_paid': 0,
+        'monthly_fine_unpaid': 0,
+    }
+
+    if start_date is None and end_date is None:
+        paid_this_month = LoanRecord.objects.filter(
+            payment_date__gte=first_day_of_month,
+            fine_paid=True
+        ).aggregate(total=Sum('fine_amount'))['total'] or 0
+        stats['monthly_fine_total'] = float(paid_this_month) + total_pending_fine
+        stats['monthly_fine_paid'] = float(paid_this_month)
+        stats['monthly_fine_unpaid'] = total_pending_fine
+    else:
+        paid_in_range = loans_in_range.filter(
+            fine_paid=True,
+            payment_date__isnull=False
+        )
+        if start_date:
+            paid_in_range = paid_in_range.filter(payment_date__gte=start_date)
+        if end_date:
+            paid_in_range = paid_in_range.filter(payment_date__lte=end_date)
+        paid_total = paid_in_range.aggregate(total=Sum('fine_amount'))['total'] or 0
+        unpaid_total = sum(loan.calculate_fine() for loan in loans_in_range.filter(status='pending_payment'))
+        stats['monthly_fine_total'] = float(paid_total) + unpaid_total
+        stats['monthly_fine_paid'] = float(paid_total)
+        stats['monthly_fine_unpaid'] = unpaid_total
+
+    return JsonResponse(stats)
+
+@login_required
+def dashboard_category_ranking(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    from django.db.models import Count
+
+    start_date, end_date = _parse_date_range(request)
+    loans = _filter_loans_by_date(start_date, end_date)
+
+    category_stats = loans.values(
+        'book__category__name',
+        'book__category__id'
+    ).annotate(
+        borrow_count=Count('id')
+    ).order_by('-borrow_count')
+
+    categories = []
+    for stat in category_stats:
+        if stat['book__category__name']:
+            categories.append({
+                'id': stat['book__category__id'],
+                'name': stat['book__category__name'],
+                'borrow_count': stat['borrow_count']
+            })
+
+    return JsonResponse({'categories': categories})
+
+@login_required
+def dashboard_user_ranking(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    from django.db.models import Count
+
+    start_date, end_date = _parse_date_range(request)
+    loans = _filter_loans_by_date(start_date, end_date)
+
+    user_stats = loans.values(
+        'user__id',
+        'user__username'
+    ).annotate(
+        borrow_count=Count('id')
+    ).order_by('-borrow_count')[:10]
+
+    users = []
+    for idx, stat in enumerate(user_stats, 1):
+        users.append({
+            'rank': idx,
+            'user_id': stat['user__id'],
+            'username': stat['user__username'],
+            'borrow_count': stat['borrow_count']
+        })
+
+    return JsonResponse({'users': users})
+
+@login_required
+def dashboard_loan_details(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    start_date, end_date = _parse_date_range(request)
+    loans = _filter_loans_by_date(start_date, end_date).select_related('user', 'book').order_by('-borrow_date')
+
+    details = []
+    for loan in loans:
+        category_name = loan.book.category.name if loan.book.category else '未分类'
+        return_date_str = loan.return_date.strftime('%Y-%m-%d') if loan.return_date else ''
+        details.append({
+            'id': loan.id,
+            'username': loan.user.username,
+            'book_title': loan.book.title,
+            'category': category_name,
+            'borrow_date': loan.borrow_date.strftime('%Y-%m-%d'),
+            'due_date': loan.due_date.strftime('%Y-%m-%d'),
+            'return_date': return_date_str,
+            'status': loan.get_status_display(),
+            'fine_amount': float(loan.fine_amount) if loan.fine_amount else 0
+        })
+
+    return JsonResponse({'loans': details})
+
+@login_required
+def dashboard_chart_data_v2(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    from datetime import timedelta
+
+    start_date, end_date = _parse_date_range(request)
+
+    if start_date and end_date:
+        days_total = (end_date - start_date).days + 1
+        labels = []
+        data = []
+        for i in range(days_total):
+            target_date = start_date + timedelta(days=i)
+            labels.append(target_date.strftime('%m-%d'))
+            count = LoanRecord.objects.filter(borrow_date=target_date).count()
+            data.append(count)
+        return JsonResponse({
+            'labels': labels,
+            'data': data
+        })
+
+    today = timezone.now().date()
+    weekly_labels = []
+    weekly_data = []
+    for i in range(6, -1, -1):
+        target_date = today - timedelta(days=i)
+        weekly_labels.append(target_date.strftime('%m-%d'))
+        count = LoanRecord.objects.filter(borrow_date=target_date).count()
+        weekly_data.append(count)
+
+    monthly_labels = ['前四周', '前三周', '前两周', '本周']
+    monthly_data = []
+    for i in range(3, -1, -1):
+        start_d = today - timedelta(days=(i * 7) + 6)
+        end_d = today - timedelta(days=i * 7)
+        count = LoanRecord.objects.filter(borrow_date__range=[start_d, end_d]).count()
+        monthly_data.append(count)
+
+    return JsonResponse({
+        'weekly': {
+            'labels': weekly_labels,
+            'data': weekly_data
+        },
+        'monthly': {
+            'labels': monthly_labels,
+            'data': monthly_data
+        }
+    })
+
+@login_required
+def dashboard_export_excel(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from django.db.models import Sum
+    from datetime import date, datetime
+    from django.http import HttpResponse
+    import io
+
+    start_date, end_date = _parse_date_range(request)
+    loans = _filter_loans_by_date(start_date, end_date).select_related('user', 'book').order_by('-borrow_date')
+
+    today = date.today()
+    first_day_of_month = today.replace(day=1)
+
+    wb = Workbook()
+
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='4f46e5', end_color='4f46e5', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    def style_header(ws, row_num, num_cols):
+        for col in range(1, num_cols + 1):
+            cell = ws.cell(row=row_num, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+    def style_data(ws, start_row, end_row, num_cols):
+        for row in range(start_row, end_row + 1):
+            for col in range(1, num_cols + 1):
+                ws.cell(row=row, column=col).border = thin_border
+
+    ws1 = wb.active
+    ws1.title = '概览数据'
+
+    total_stock = Book.objects.aggregate(total=Sum('total_stock'))['total'] or 0
+    active_loans_count = LoanRecord.objects.filter(status='borrowed').count()
+    borrow_rate = (active_loans_count / total_stock * 100) if total_stock > 0 else 0.0
+
+    returned_loans = loans.filter(status__in=['returned', 'pending_payment'])
+    durations = []
+    for loan in returned_loans:
+        if loan.return_date:
+            duration = (loan.return_date - loan.borrow_date).days
+            if duration > 0:
+                durations.append(duration)
+    avg_borrow_days = round(sum(durations) / len(durations), 1) if durations else 0
+
+    ws1['A1'] = '图书馆管理系统 - 数据报表'
+    ws1['A1'].font = Font(bold=True, size=16)
+    ws1.merge_cells('A1:D1')
+    ws1['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+    ws1['A2'] = f'报表生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    ws1.merge_cells('A2:D2')
+    ws1['A2'].alignment = Alignment(horizontal='center')
+    ws1['A2'].font = Font(size=10, color='666666')
+
+    date_range_text = '全部时间'
+    if start_date and end_date:
+        date_range_text = f'{start_date.strftime("%Y-%m-%d")} 至 {end_date.strftime("%Y-%m-%d")}'
+    ws1['A3'] = f'统计范围：{date_range_text}'
+    ws1.merge_cells('A3:D3')
+    ws1['A3'].alignment = Alignment(horizontal='center')
+    ws1['A3'].font = Font(size=10, color='666666')
+
+    ws1.append([])
+    ws1.append(['指标', '数值', '指标', '数值'])
+    style_header(ws1, 5, 4)
+
+    has_date_range_export = start_date is not None or end_date is not None
+
+    new_books_qs = Book.objects.all()
+    if not has_date_range_export:
+        new_books_qs = new_books_qs.filter(created_at__date__gte=first_day_of_month)
+    else:
+        if start_date:
+            new_books_qs = new_books_qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            new_books_qs = new_books_qs.filter(created_at__date__lte=end_date)
+    new_books_count = new_books_qs.count()
+
+    new_users_qs = User.objects.filter(role='reader')
+    if not has_date_range_export:
+        new_users_qs = new_users_qs.filter(created_at__date__gte=first_day_of_month)
+    else:
+        if start_date:
+            new_users_qs = new_users_qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            new_users_qs = new_users_qs.filter(created_at__date__lte=end_date)
+    new_users_count = new_users_qs.count()
+
+    paid_in_range = loans.filter(fine_paid=True, payment_date__isnull=False)
+    if start_date:
+        paid_in_range = paid_in_range.filter(payment_date__gte=start_date)
+    if end_date:
+        paid_in_range = paid_in_range.filter(payment_date__lte=end_date)
+    paid_total = float(paid_in_range.aggregate(total=Sum('fine_amount'))['total'] or 0)
+    unpaid_total = sum(loan.calculate_fine() for loan in loans.filter(status='pending_payment'))
+
+    stats_rows = [
+        ['图书总数', Book.objects.count(), '注册用户数', User.objects.count()],
+        ['本月新增图书', new_books_count, '本月新注册用户', new_users_count],
+        ['借出中图书', active_loans_count, '图书借出率', f'{round(borrow_rate, 1)}%'],
+        ['总借阅次数', loans.count(), '平均借阅周期', f'{avg_borrow_days} 天'],
+        ['待审核申请', LoanRecord.objects.filter(status='pending').count(), '待缴费笔数', loans.filter(status='pending_payment').count()],
+        ['已收罚款', f'¥{paid_total:.2f}', '未收罚款', f'¥{unpaid_total:.2f}'],
+    ]
+
+    for row in stats_rows:
+        ws1.append(row)
+
+    style_data(ws1, 6, 5 + len(stats_rows), 4)
+
+    ws1.column_dimensions['A'].width = 20
+    ws1.column_dimensions['B'].width = 20
+    ws1.column_dimensions['C'].width = 20
+    ws1.column_dimensions['D'].width = 20
+
+    ws2 = wb.create_sheet('借阅明细')
+    headers2 = ['序号', '读者', '图书名称', '分类', '借阅日期', '应还日期', '归还日期', '状态', '罚款金额']
+    ws2.append(headers2)
+    style_header(ws2, 1, len(headers2))
+
+    for idx, loan in enumerate(loans, 1):
+        category_name = loan.book.category.name if loan.book.category else '未分类'
+        return_date_str = loan.return_date.strftime('%Y-%m-%d') if loan.return_date else '-'
+        fine_str = f'¥{float(loan.fine_amount):.2f}' if loan.fine_amount else '¥0.00'
+        ws2.append([
+            idx,
+            loan.user.username,
+            loan.book.title,
+            category_name,
+            loan.borrow_date.strftime('%Y-%m-%d'),
+            loan.due_date.strftime('%Y-%m-%d'),
+            return_date_str,
+            loan.get_status_display(),
+            fine_str
+        ])
+
+    if loans.count() > 0:
+        style_data(ws2, 2, 1 + loans.count(), len(headers2))
+
+    ws2.column_dimensions['A'].width = 8
+    ws2.column_dimensions['B'].width = 15
+    ws2.column_dimensions['C'].width = 30
+    ws2.column_dimensions['D'].width = 15
+    ws2.column_dimensions['E'].width = 15
+    ws2.column_dimensions['F'].width = 15
+    ws2.column_dimensions['G'].width = 15
+    ws2.column_dimensions['H'].width = 12
+    ws2.column_dimensions['I'].width = 12
+
+    ws3 = wb.create_sheet('用户排行')
+    headers3 = ['排名', '用户名', '借阅次数']
+    ws3.append(headers3)
+    style_header(ws3, 1, len(headers3))
+
+    from django.db.models import Count as DBCount
+    user_stats = loans.values('user__id', 'user__username').annotate(
+        borrow_count=DBCount('id')
+    ).order_by('-borrow_count')[:10]
+
+    for idx, stat in enumerate(user_stats, 1):
+        ws3.append([idx, stat['user__username'], stat['borrow_count']])
+
+    if user_stats.count() > 0:
+        style_data(ws3, 2, 1 + user_stats.count(), len(headers3))
+
+    ws3.column_dimensions['A'].width = 10
+    ws3.column_dimensions['B'].width = 25
+    ws3.column_dimensions['C'].width = 15
+
+    ws4 = wb.create_sheet('分类统计')
+    headers4 = ['排名', '分类名称', '借阅次数', '占比']
+    ws4.append(headers4)
+    style_header(ws4, 1, len(headers4))
+
+    category_stats = loans.values(
+        'book__category__name',
+        'book__category__id'
+    ).annotate(
+        borrow_count=DBCount('id')
+    ).order_by('-borrow_count')
+
+    total_loans_count = loans.count()
+    for idx, stat in enumerate(category_stats, 1):
+        cat_name = stat['book__category__name'] or '未分类'
+        percentage = (stat['borrow_count'] / total_loans_count * 100) if total_loans_count > 0 else 0
+        ws4.append([idx, cat_name, stat['borrow_count'], f'{round(percentage, 1)}%'])
+
+    if category_stats.count() > 0:
+        style_data(ws4, 2, 1 + category_stats.count(), len(headers4))
+
+    ws4.column_dimensions['A'].width = 10
+    ws4.column_dimensions['B'].width = 25
+    ws4.column_dimensions['C'].width = 15
+    ws4.column_dimensions['D'].width = 15
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f'图书馆数据报表_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return response

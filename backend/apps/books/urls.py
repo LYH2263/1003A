@@ -5,6 +5,12 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('dashboard/chart-data/', views.dashboard_chart_data, name='dashboard_chart_data'),
+    path('dashboard/overview/', views.dashboard_overview, name='dashboard_overview'),
+    path('dashboard/category-ranking/', views.dashboard_category_ranking, name='dashboard_category_ranking'),
+    path('dashboard/user-ranking/', views.dashboard_user_ranking, name='dashboard_user_ranking'),
+    path('dashboard/loan-details/', views.dashboard_loan_details, name='dashboard_loan_details'),
+    path('dashboard/chart-data-v2/', views.dashboard_chart_data_v2, name='dashboard_chart_data_v2'),
+    path('dashboard/export-excel/', views.dashboard_export_excel, name='dashboard_export_excel'),
     
     # Book Management
     path('books/manage/', views.book_manage, name='book_manage'),

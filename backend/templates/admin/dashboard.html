@@ -3,6 +3,31 @@
 {% block page_title %}管理概览{% endblock %}
 
 {% block content %}
+<!-- Date Range & Export Controls -->
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-calendar-alt text-indigo-600"></i>
+            <span class="text-sm font-medium text-slate-700">日期范围：</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="date" id="start_date" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <span class="text-slate-400">至</span>
+            <input type="date" id="end_date" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        </div>
+        <button id="apply-date-range" class="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors">
+            <i class="fas fa-sync-alt mr-1"></i>应用筛选
+        </button>
+        <button id="reset-date-range" class="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-200 transition-colors">
+            重置
+        </button>
+    </div>
+    <button id="export-excel-btn" class="px-5 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-2">
+        <i class="fas fa-file-excel"></i>
+        导出报表
+    </button>
+</div>
+
 <!-- Stats Grid -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
@@ -11,7 +36,7 @@
         </div>
         <div>
             <p class="text-sm font-medium text-slate-500">图书总数</p>
-            <h4 class="text-2xl font-bold text-slate-900">{{ stats.total_books }}</h4>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-total-books">--</h4>
         </div>
     </div>
     
@@ -21,7 +46,7 @@
         </div>
         <div>
             <p class="text-sm font-medium text-slate-500">注册用户</p>
-            <h4 class="text-2xl font-bold text-slate-900">{{ stats.total_users }}</h4>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-total-users">--</h4>
         </div>
     </div>
     
@@ -31,17 +56,57 @@
         </div>
         <div>
             <p class="text-sm font-medium text-slate-500">借出中</p>
-            <h4 class="text-2xl font-bold text-slate-900">{{ stats.active_loans }}</h4>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-active-loans">--</h4>
         </div>
     </div>
     
-    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4 animate-pulse">
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
         <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl">
             <i class="fas fa-bell"></i>
         </div>
         <div>
             <p class="text-sm font-medium text-slate-500">待审批</p>
-            <h4 class="text-2xl font-bold text-slate-900">{{ stats.pending_requests }}</h4>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-pending-requests">--</h4>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-book-medical"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">本月新增图书</p>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-new-books">--</h4>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-user-plus"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">本月新注册用户</p>
+            <h4 class="text-2xl font-bold text-slate-900" id="stat-new-users">--</h4>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-chart-pie"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">图书借出率</p>
+            <h4 class="text-2xl font-bold text-slate-900"><span id="stat-borrow-rate">--</span>%</h4>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center space-x-4">
+        <div class="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-slate-500">平均借阅周期</p>
+            <h4 class="text-2xl font-bold text-slate-900"><span id="stat-avg-days">--</span> 天</h4>
         </div>
     </div>
 </div>
@@ -58,28 +123,28 @@
                 <i class="fas fa-file-invoice-dollar text-xl"></i>
             </div>
             <p class="text-xs text-slate-500 mb-1">本月应收罚款</p>
-            <h4 class="text-2xl font-bold text-slate-800">¥{{ stats.monthly_fine_total|floatformat:2 }}</h4>
+            <h4 class="text-2xl font-bold text-slate-800">¥<span id="stat-fine-total">--</span></h4>
         </div>
         <div class="bg-slate-50 rounded-2xl p-4 text-center">
             <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                 <i class="fas fa-check-circle text-xl"></i>
             </div>
             <p class="text-xs text-slate-500 mb-1">已收金额</p>
-            <h4 class="text-2xl font-bold text-emerald-600">¥{{ stats.monthly_fine_paid|floatformat:2 }}</h4>
+            <h4 class="text-2xl font-bold text-emerald-600">¥<span id="stat-fine-paid">--</span></h4>
         </div>
         <div class="bg-slate-50 rounded-2xl p-4 text-center">
             <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
                 <i class="fas fa-clock text-xl"></i>
             </div>
             <p class="text-xs text-slate-500 mb-1">未收金额</p>
-            <h4 class="text-2xl font-bold text-amber-600">¥{{ stats.monthly_fine_unpaid|floatformat:2 }}</h4>
-            <p class="text-[10px] text-slate-400 mt-1">{{ stats.pending_payments }} 笔待缴</p>
+            <h4 class="text-2xl font-bold text-amber-600">¥<span id="stat-fine-unpaid">--</span></h4>
+            <p class="text-[10px] text-slate-400 mt-1"><span id="stat-pending-payments">--</span> 笔待缴</p>
         </div>
     </div>
 </div>
 
 <div class="grid lg:grid-cols-3 gap-10">
-    <!-- Main Column (Chart + Recent Activity) -->
+    <!-- Main Column -->
     <div class="lg:col-span-2 space-y-6">
         
         <!-- Borrowing Trends Chart -->
@@ -89,13 +154,26 @@
                     <h3 class="font-bold text-slate-800 text-lg">借阅趋势分析</h3>
                     <p class="text-xs text-slate-500 mt-1">系统借阅与归还活动情况</p>
                 </div>
-                <div class="flex space-x-2 bg-slate-50 p-1 rounded-xl">
-                    <button id="btn-this-week" class="chart-btn px-4 py-1.5 text-xs font-bold bg-white text-indigo-600 rounded-lg shadow-sm transition-all duration-200">本周</button>
-                    <button id="btn-this-month" class="chart-btn px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg transition-all duration-200">本月</button>
+                <div class="flex space-x-2 bg-slate-50 p-1 rounded-xl" id="chart-period-buttons">
+                    <button id="btn-this-week" class="chart-period-btn px-4 py-1.5 text-xs font-bold bg-white text-indigo-600 rounded-lg shadow-sm transition-all duration-200">本周</button>
+                    <button id="btn-this-month" class="chart-period-btn px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg transition-all duration-200">本月</button>
                 </div>
             </div>
             <div class="h-64 sm:h-80 w-full relative">
                 <canvas id="borrowTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Category Ranking Chart -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-6">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg">分类热度排行</h3>
+                    <p class="text-xs text-slate-500 mt-1">各分类被借阅的总次数排名</p>
+                </div>
+            </div>
+            <div class="h-80 w-full relative">
+                <canvas id="categoryRankingChart"></canvas>
             </div>
         </div>
 
@@ -115,33 +193,17 @@
                             <th class="px-6 py-4 text-center">状态</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 italic">
-                        {% for loan in recent_loans %}
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ loan.user.username }}</td>
-                            <td class="px-6 py-4 text-sm text-slate-600 line-clamp-1 mt-3">{{ loan.book.title }}</td>
-                            <td class="px-6 py-4 text-xs text-slate-400">{{ loan.borrow_date|date:"Y-m-d" }}</td>
-                            <td class="px-6 py-4 text-center">
-                                <span class="px-2 py-1 text-[10px] font-bold rounded-full 
-                                    {% if loan.status == 'borrowed' %}bg-emerald-100 text-emerald-700
-                                    {% elif loan.status == 'pending' %}bg-orange-100 text-orange-700
-                                    {% else %}bg-slate-100 text-slate-600{% endif %}">
-                                    {{ loan.get_status_display }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% empty %}
+                    <tbody class="divide-y divide-slate-100" id="recent-loans-body">
                         <tr>
-                            <td colspan="4" class="px-6 py-10 text-center text-slate-300 text-sm">暂无借阅动态</td>
+                            <td colspan="4" class="px-6 py-10 text-center text-slate-300 text-sm">加载中...</td>
                         </tr>
-                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Right Column -->
     <div class="space-y-6">
         <div class="bg-indigo-900 rounded-3xl p-8 text-white shadow-xl">
             <h3 class="text-xl font-bold mb-6">快捷操作</h3>
@@ -158,7 +220,32 @@
                     <i class="fas fa-user-plus text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
                     <span class="text-xs font-bold">会员核对</span>
                 </a>
-                
+            </div>
+        </div>
+
+        <!-- User Activity Ranking -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center bg-slate-50/50">
+                <h3 class="font-bold text-slate-800 flex items-center">
+                    <i class="fas fa-trophy text-amber-500 mr-2"></i>
+                    用户活跃度排行
+                </h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3 w-12">排名</th>
+                            <th class="px-4 py-3">用户名</th>
+                            <th class="px-4 py-3 text-right">借阅量</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="user-ranking-body">
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-slate-300 text-sm">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
@@ -167,7 +254,7 @@
                 <i class="fas fa-chart-pie text-8xl"></i>
             </div>
             <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">活跃度提示</p>
-            <p class="text-sm font-light leading-relaxed">本周系统处理了 <span class="text-indigo-400 font-bold">24</span> 笔借阅请求，比上周提升了 12%。继续保持！</p>
+            <p class="text-sm font-light leading-relaxed">使用日期筛选器查看不同时间段的借阅分析，支持导出 Excel 报表进行深入分析。</p>
         </div>
     </div>
 </div>
@@ -177,127 +264,400 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function() {
-        const ctx = document.getElementById('borrowTrendChart').getContext('2d');
-        
-        // Setup gradient for the area under the line
-        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)'); // Indigo-600 with 20% opacity
-        gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');   // Transparent
-        
-        let weeklyData = { labels: [], data: [] };
-        let monthlyData = { labels: [], data: [] };
-        let chart;
+        const overviewUrl = "{% url 'dashboard_overview' %}";
+        const categoryRankingUrl = "{% url 'dashboard_category_ranking' %}";
+        const userRankingUrl = "{% url 'dashboard_user_ranking' %}";
+        const loanDetailsUrl = "{% url 'dashboard_loan_details' %}";
+        const chartDataUrl = "{% url 'dashboard_chart_data_v2' %}";
+        const exportExcelUrl = "{% url 'dashboard_export_excel' %}";
 
-        try {
-            const response = await fetch("{% url 'dashboard_chart_data' %}");
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            
-            weeklyData = data.weekly;
-            monthlyData = data.monthly;
-            
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: weeklyData.labels,
-                    datasets: [{
-                        label: '借阅活动',
-                        data: weeklyData.data,
-                        borderColor: '#4f46e5', // tailwind indigo-600
-                        backgroundColor: gradient,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#4f46e5',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: true,
-                        tension: 0.4 // Smooth curves
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false // Hide default legend
+        let borrowTrendChart = null;
+        let categoryRankingChart = null;
+        let currentPeriod = 'week';
+        let globalStartDate = '';
+        let globalEndDate = '';
+
+        function buildQueryParams() {
+            const params = new URLSearchParams();
+            if (globalStartDate) params.append('start_date', globalStartDate);
+            if (globalEndDate) params.append('end_date', globalEndDate);
+            return params;
+        }
+
+        function formatNumber(num, decimals = 0) {
+            if (num === null || num === undefined) return '--';
+            if (decimals > 0) return Number(num).toFixed(decimals);
+            return Math.round(num).toString();
+        }
+
+        function getRankBadgeClass(rank) {
+            if (rank === 1) return 'bg-amber-100 text-amber-700';
+            if (rank === 2) return 'bg-slate-200 text-slate-700';
+            if (rank === 3) return 'bg-orange-100 text-orange-700';
+            return 'bg-slate-100 text-slate-600';
+        }
+
+        async function loadOverview() {
+            try {
+                const params = buildQueryParams();
+                const response = await fetch(`${overviewUrl}?${params.toString()}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                document.getElementById('stat-total-books').textContent = formatNumber(data.total_books);
+                document.getElementById('stat-total-users').textContent = formatNumber(data.total_users);
+                document.getElementById('stat-active-loans').textContent = formatNumber(data.active_loans);
+                document.getElementById('stat-pending-requests').textContent = formatNumber(data.pending_requests);
+                document.getElementById('stat-new-books').textContent = formatNumber(data.new_books_count);
+                document.getElementById('stat-new-users').textContent = formatNumber(data.new_users_count);
+                document.getElementById('stat-borrow-rate').textContent = formatNumber(data.borrow_rate, 1);
+                document.getElementById('stat-avg-days').textContent = formatNumber(data.avg_borrow_days, 1);
+                document.getElementById('stat-fine-total').textContent = formatNumber(data.monthly_fine_total, 2);
+                document.getElementById('stat-fine-paid').textContent = formatNumber(data.monthly_fine_paid, 2);
+                document.getElementById('stat-fine-unpaid').textContent = formatNumber(data.monthly_fine_unpaid, 2);
+                document.getElementById('stat-pending-payments').textContent = formatNumber(data.pending_payments);
+            } catch (error) {
+                console.error('Failed to load overview:', error);
+            }
+        }
+
+        async function loadBorrowTrendChart() {
+            try {
+                const ctx = document.getElementById('borrowTrendChart').getContext('2d');
+                const params = buildQueryParams();
+
+                let labels = [];
+                let dataValues = [];
+                let hasDateRange = globalStartDate && globalEndDate;
+
+                if (hasDateRange) {
+                    const response = await fetch(`${chartDataUrl}?${params.toString()}`);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const data = await response.json();
+                    labels = data.labels || [];
+                    dataValues = data.data || [];
+                    document.getElementById('chart-period-buttons').style.display = 'none';
+                } else {
+                    const response = await fetch(chartDataUrl);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const data = await response.json();
+                    const periodData = currentPeriod === 'week' ? data.weekly : data.monthly;
+                    labels = periodData.labels;
+                    dataValues = periodData.data;
+                    document.getElementById('chart-period-buttons').style.display = 'flex';
+                }
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
+                gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
+
+                if (borrowTrendChart) {
+                    borrowTrendChart.data.labels = labels;
+                    borrowTrendChart.data.datasets[0].data = dataValues;
+                    borrowTrendChart.data.datasets[0].backgroundColor = gradient;
+                    borrowTrendChart.update();
+                } else {
+                    borrowTrendChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '借阅活动',
+                                data: dataValues,
+                                borderColor: '#4f46e5',
+                                backgroundColor: gradient,
+                                borderWidth: 3,
+                                pointBackgroundColor: '#ffffff',
+                                pointBorderColor: '#4f46e5',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                fill: true,
+                                tension: 0.4
+                            }]
                         },
-                        tooltip: {
-                            backgroundColor: '#1e293b', // tailwind slate-800
-                            padding: 12,
-                            titleFont: { size: 13, family: 'Inter, sans-serif' },
-                            bodyFont: { size: 14, family: 'Inter, sans-serif', weight: 'bold' },
-                            displayColors: false,
-                            callbacks: {
-                                label: function(context) {
-                                    return context.parsed.y + ' 次借出/借入';
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1e293b',
+                                    padding: 12,
+                                    titleFont: { size: 13, family: 'Inter, sans-serif' },
+                                    bodyFont: { size: 14, family: 'Inter, sans-serif', weight: 'bold' },
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.parsed.y + ' 次借出/借入';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { display: false, drawBorder: false },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { family: 'Inter, sans-serif', size: 12 }
+                                    }
+                                },
+                                y: {
+                                    grid: {
+                                        color: '#f1f5f9',
+                                        drawBorder: false,
+                                        borderDash: [5, 5]
+                                    },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { family: 'Inter, sans-serif', size: 12 },
+                                        padding: 10,
+                                        stepSize: 10
+                                    },
+                                    beginAtZero: true
+                                }
+                            },
+                            interaction: { intersect: false, mode: 'index' },
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load borrow trend chart:', error);
+            }
+        }
+
+        async function loadCategoryRankingChart() {
+            try {
+                const ctx = document.getElementById('categoryRankingChart').getContext('2d');
+                const params = buildQueryParams();
+                const response = await fetch(`${categoryRankingUrl}?${params.toString()}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                const categories = data.categories || [];
+                const labels = categories.map(c => c.name).reverse();
+                const dataValues = categories.map(c => c.borrow_count).reverse();
+
+                const backgroundColors = labels.map((_, i) => {
+                    const opacity = 0.3 + (i / labels.length) * 0.5;
+                    return `rgba(79, 70, 229, ${opacity})`;
+                });
+
+                if (categoryRankingChart) {
+                    categoryRankingChart.data.labels = labels;
+                    categoryRankingChart.data.datasets[0].data = dataValues;
+                    categoryRankingChart.data.datasets[0].backgroundColor = backgroundColors;
+                    categoryRankingChart.update();
+                } else {
+                    categoryRankingChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '借阅次数',
+                                data: dataValues,
+                                backgroundColor: backgroundColors,
+                                borderColor: '#4f46e5',
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                barThickness: 24
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1e293b',
+                                    padding: 12,
+                                    titleFont: { size: 13, family: 'Inter, sans-serif' },
+                                    bodyFont: { size: 14, family: 'Inter, sans-serif', weight: 'bold' },
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.parsed.x + ' 次借阅';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        color: '#f1f5f9',
+                                        drawBorder: false,
+                                        borderDash: [5, 5]
+                                    },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { family: 'Inter, sans-serif', size: 12 }
+                                    },
+                                    beginAtZero: true
+                                },
+                                y: {
+                                    grid: { display: false, drawBorder: false },
+                                    ticks: {
+                                        color: '#475569',
+                                        font: { family: 'Inter, sans-serif', size: 12, weight: '500' }
+                                    }
                                 }
                             }
                         }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            },
-                            ticks: {
-                                color: '#94a3b8', // tailwind slate-400
-                                font: { family: 'Inter, sans-serif', size: 12 }
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: '#f1f5f9', // tailwind slate-100
-                                drawBorder: false,
-                                borderDash: [5, 5]
-                            },
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { family: 'Inter, sans-serif', size: 12 },
-                                padding: 10,
-                                stepSize: 10
-                            },
-                            beginAtZero: true
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index',
-                    },
+                    });
                 }
-            });
+            } catch (error) {
+                console.error('Failed to load category ranking chart:', error);
+            }
+        }
 
-            // Button interaction logic
-            const btnThisWeek = document.getElementById('btn-this-week');
-            const btnThisMonth = document.getElementById('btn-this-month');
+        async function loadUserRanking() {
+            try {
+                const params = buildQueryParams();
+                const response = await fetch(`${userRankingUrl}?${params.toString()}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
 
-            function setActiveButton(activeBtn, inactiveBtn) {
-                activeBtn.classList.remove('font-medium', 'text-slate-500', 'hover:text-slate-700', 'bg-transparent');
-                activeBtn.classList.add('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
-                
-                inactiveBtn.classList.remove('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
-                inactiveBtn.classList.add('font-medium', 'text-slate-500', 'hover:text-slate-700');
+                const tbody = document.getElementById('user-ranking-body');
+                const users = data.users || [];
+
+                if (users.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-slate-300 text-sm">暂无数据</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${getRankBadgeClass(user.rank)}">
+                                ${user.rank}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-medium text-slate-700">${user.username}</td>
+                        <td class="px-4 py-3 text-sm text-right font-bold text-indigo-600">${user.borrow_count}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load user ranking:', error);
+            }
+        }
+
+        async function loadRecentLoans() {
+            try {
+                const params = buildQueryParams();
+                const response = await fetch(`${loanDetailsUrl}?${params.toString()}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                const tbody = document.getElementById('recent-loans-body');
+                const loans = (data.loans || []).slice(0, 5);
+
+                if (loans.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="px-6 py-10 text-center text-slate-300 text-sm">暂无借阅动态</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                const statusMap = {
+                    '待审核': { class: 'bg-orange-100 text-orange-700', label: '待审核' },
+                    '借阅中': { class: 'bg-emerald-100 text-emerald-700', label: '借阅中' },
+                    '已归还': { class: 'bg-slate-100 text-slate-600', label: '已归还' },
+                    '已拒绝': { class: 'bg-red-100 text-red-600', label: '已拒绝' },
+                    '待缴费': { class: 'bg-amber-100 text-amber-700', label: '待缴费' }
+                };
+
+                tbody.innerHTML = loans.map(loan => {
+                    const statusInfo = statusMap[loan.status] || { class: 'bg-slate-100 text-slate-600', label: loan.status };
+                    return `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 text-sm font-medium text-slate-700">${loan.username}</td>
+                            <td class="px-6 py-4 text-sm text-slate-600 line-clamp-1 mt-3">${loan.book_title}</td>
+                            <td class="px-6 py-4 text-xs text-slate-400">${loan.borrow_date}</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="px-2 py-1 text-[10px] font-bold rounded-full ${statusInfo.class}">
+                                    ${statusInfo.label}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load recent loans:', error);
+            }
+        }
+
+        function refreshAllData() {
+            loadOverview();
+            loadBorrowTrendChart();
+            loadCategoryRankingChart();
+            loadUserRanking();
+            loadRecentLoans();
+        }
+
+        const btnThisWeek = document.getElementById('btn-this-week');
+        const btnThisMonth = document.getElementById('btn-this-month');
+
+        function setActivePeriodButton(activeBtn, inactiveBtn) {
+            activeBtn.classList.remove('font-medium', 'text-slate-500', 'hover:text-slate-700', 'bg-transparent');
+            activeBtn.classList.add('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
+            
+            inactiveBtn.classList.remove('font-bold', 'bg-white', 'text-indigo-600', 'shadow-sm');
+            inactiveBtn.classList.add('font-medium', 'text-slate-500', 'hover:text-slate-700');
+        }
+
+        btnThisWeek.addEventListener('click', () => {
+            currentPeriod = 'week';
+            setActivePeriodButton(btnThisWeek, btnThisMonth);
+            loadBorrowTrendChart();
+        });
+
+        btnThisMonth.addEventListener('click', () => {
+            currentPeriod = 'month';
+            setActivePeriodButton(btnThisMonth, btnThisWeek);
+            loadBorrowTrendChart();
+        });
+
+        document.getElementById('apply-date-range').addEventListener('click', () => {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            
+            if (start && end && start > end) {
+                alert('起始日期不能晚于结束日期');
+                return;
             }
 
-            btnThisWeek.addEventListener('click', () => {
-                setActiveButton(btnThisWeek, btnThisMonth);
-                chart.data.labels = weeklyData.labels;
-                chart.data.datasets[0].data = weeklyData.data;
-                chart.update();
-            });
+            globalStartDate = start;
+            globalEndDate = end;
+            refreshAllData();
+        });
 
-            btnThisMonth.addEventListener('click', () => {
-                setActiveButton(btnThisMonth, btnThisWeek);
-                chart.data.labels = monthlyData.labels;
-                chart.data.datasets[0].data = monthlyData.data;
-                chart.update();
-            });
+        document.getElementById('reset-date-range').addEventListener('click', () => {
+            document.getElementById('start_date').value = '';
+            document.getElementById('end_date').value = '';
+            globalStartDate = '';
+            globalEndDate = '';
+            currentPeriod = 'week';
+            setActivePeriodButton(btnThisWeek, btnThisMonth);
+            refreshAllData();
+        });
+
+        document.getElementById('export-excel-btn').addEventListener('click', () => {
+            const params = new URLSearchParams();
+            if (globalStartDate) params.append('start_date', globalStartDate);
+            if (globalEndDate) params.append('end_date', globalEndDate);
             
-        } catch (error) {
-            console.error('Failed to fetch chart data:', error);
-            // Fallback or error state could be handled here
-        }
+            const url = `${exportExcelUrl}?${params.toString()}`;
+            window.location.href = url;
+        });
+
+        refreshAllData();
     });
 </script>
 {% endblock %}
