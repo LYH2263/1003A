@@ -106,10 +106,10 @@ def book_manage(request):
         count = Reservation.objects.filter(book=book, status__in=['waiting', 'notified']).count()
         reservation_counts[book.id] = count
     
-    categories = Category.objects.all()
+    top_categories = Category.objects.filter(parent=None).prefetch_related('children')
     return render(request, 'admin/book_list.html', {
         'books': books,
-        'categories': categories,
+        'top_categories': top_categories,
         'reservation_counts': reservation_counts
     })
 
@@ -239,6 +239,7 @@ def loan_manage(request):
 def book_browse(request):
     query = request.GET.get('q', '')
     category_id = request.GET.get('category', '')
+    parent_category_id = request.GET.get('parent_category', '')
     
     books = Book.objects.all().annotate(
         avg_rating=Avg('reviews__rating'),
@@ -248,9 +249,17 @@ def book_browse(request):
         books = books.filter(Q(title__icontains=query) | Q(author__icontains=query) | Q(isbn__icontains=query))
     if category_id:
         books = books.filter(category_id=category_id)
-        
-    categories = Category.objects.all()
-    return render(request, 'books/browse.html', {'books': books, 'categories': categories, 'query': query})
+    elif parent_category_id:
+        books = books.filter(category__parent_id=parent_category_id)
+    
+    top_categories = Category.objects.filter(parent=None).prefetch_related('children')
+    return render(request, 'books/browse.html', {
+        'books': books, 
+        'top_categories': top_categories, 
+        'query': query,
+        'selected_category': category_id,
+        'selected_parent': parent_category_id
+    })
 
 def get_book_rating_info(book):
     reviews = book.reviews.all()
@@ -724,6 +733,39 @@ def system_settings(request):
                 config.daily_fine_rate = 0.5
             config.save()
             messages.success(request, "系统基本配置已更新。")
+        elif action == 'create_category':
+            name = request.POST.get('name', '').strip()
+            parent_id = request.POST.get('parent_id')
+            if name:
+                parent = None
+                if parent_id:
+                    parent = Category.objects.get(pk=parent_id)
+                Category.objects.create(name=name, parent=parent)
+                messages.success(request, "分类创建成功。")
+            else:
+                messages.error(request, "分类名称不能为空。")
+            return redirect('system_settings')
+        elif action == 'edit_category':
+            category_id = request.POST.get('category_id')
+            name = request.POST.get('name', '').strip()
+            if category_id and name:
+                category = get_object_or_404(Category, pk=category_id)
+                category.name = name
+                category.save()
+                messages.success(request, "分类已更新。")
+            else:
+                messages.error(request, "分类名称不能为空。")
+            return redirect('system_settings')
+        elif action == 'delete_category':
+            category_id = request.POST.get('category_id')
+            if category_id:
+                category = get_object_or_404(Category, pk=category_id)
+                if category.can_delete():
+                    category.delete()
+                    messages.success(request, "分类已删除。")
+                else:
+                    messages.error(request, "该分类下有图书或子分类，无法删除。")
+            return redirect('system_settings')
         elif action == 'create_announcement':
             title = request.POST.get('title')
             content = request.POST.get('content')
@@ -798,12 +840,15 @@ def system_settings(request):
     page_number = request.GET.get('credit_page')
     credit_logs = paginator.get_page(page_number)
     
+    top_categories = Category.objects.filter(parent=None).prefetch_related('children')
+    
     return render(request, 'admin/settings.html', {
         'announcements': announcements, 
         'config': config,
         'credit_logs': credit_logs,
         'borrow_rules': borrow_rules,
-        'active_rule': active_rule
+        'active_rule': active_rule,
+        'top_categories': top_categories
     })
 
 @login_required

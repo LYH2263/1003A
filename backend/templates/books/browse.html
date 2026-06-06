@@ -3,18 +3,36 @@
 {% block page_title %}图书发现{% endblock %}
 
 {% block content %}
-<div class="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-    <div class="flex items-center space-x-3 overflow-x-auto pb-2 -mb-2 no-scrollbar">
-        <a href="?" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if not request.GET.category %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">全部</a>
-        {% for cat in categories %}
-        <a href="?category={{ cat.id }}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if request.GET.category == cat.id|stringformat:'s' %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">{{ cat.name }}</a>
-        {% endfor %}
+<div class="mb-10 space-y-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div class="flex items-center space-x-3 overflow-x-auto pb-2 -mb-2 no-scrollbar">
+            <a href="?{% if query %}q={{ query }}{% endif %}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if not selected_parent and not selected_category %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">全部</a>
+            {% for top_cat in top_categories %}
+            <a href="?parent_category={{ top_cat.id }}{% if query %}&q={{ query }}{% endif %}" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all {% if selected_parent == top_cat.id|stringformat:'s' %}bg-primary text-white shadow-lg shadow-indigo-100{% else %}bg-white text-slate-500 hover:bg-slate-50 border border-slate-100{% endif %}">{{ top_cat.name }}</a>
+            {% endfor %}
+        </div>
+        
+        <form class="relative w-full md:w-80">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" name="q" value="{{ query }}" placeholder="查找灵感..." class="w-full pl-11 pr-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all">
+            {% if selected_parent %}<input type="hidden" name="parent_category" value="{{ selected_parent }}">{% endif %}
+            {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+        </form>
     </div>
     
-    <form class="relative w-full md:w-80">
-        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-        <input type="text" name="q" value="{{ query }}" placeholder="查找灵感..." class="w-full pl-11 pr-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all">
-    </form>
+    {% if selected_parent %}
+    <div class="flex items-center space-x-2 overflow-x-auto pb-2 no-scrollbar pl-2">
+        <span class="text-xs text-slate-400 font-bold uppercase">子分类:</span>
+        <a href="?parent_category={{ selected_parent }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all {% if not selected_category %}bg-emerald-500 text-white{% else %}bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200{% endif %}">全部</a>
+        {% for top_cat in top_categories %}
+        {% if top_cat.id|stringformat:'s' == selected_parent %}
+        {% for child in top_cat.children.all %}
+        <a href="?category={{ child.id }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all {% if selected_category == child.id|stringformat:'s' %}bg-emerald-500 text-white{% else %}bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200{% endif %}">{{ child.name }}</a>
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
@@ -29,7 +47,7 @@
                 </div>
             {% endif %}
             <div class="absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur-md rounded-lg text-[10px] font-black text-slate-800 uppercase tracking-tighter">
-                {{ book.category.name }}
+                {% if book.category %}{{ book.category.get_full_name }}{% else %}未分类{% endif %}
             </div>
             {% if user.is_authenticated %}
             <button onclick="event.preventDefault(); toggleFavorite({{ book.pk }}, this)" class="favorite-btn absolute bottom-4 right-4 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-md rounded-full shadow-lg transition-all hover:scale-110" data-book-id="{{ book.pk }}">

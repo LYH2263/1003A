@@ -33,22 +33,33 @@ def seed():
         reader.save()
         print("- 普通读者账户创建成功: reader1 / 123456")
 
-    # 2. 创建图书分类
-    categories_names = ['经典文学', '科学技术', '历史哲学', '艺术教育', '由于规则而生的书籍']
-    categories = []
-    for name in categories_names:
-        cat, _ = Category.objects.get_or_create(name=name)
-        categories.append(cat)
-    print(f"- 已同步 {len(categories)} 个图书分类")
+    # 2. 创建图书分类（二级分类结构）
+    category_structure = {
+        '文学': ['经典文学', '现代文学', '外国文学'],
+        '科学技术': ['计算机科学', '物理学', '生物学'],
+        '历史哲学': ['中国历史', '世界历史', '哲学思想'],
+        '艺术教育': ['设计艺术', '音乐美术', '教育理论'],
+        '社会科学': ['经济学', '心理学', '社会学'],
+    }
+    
+    all_categories = {}
+    for parent_name, children in category_structure.items():
+        parent_cat, _ = Category.objects.get_or_create(name=parent_name, parent=None)
+        all_categories[parent_name] = parent_cat
+        for child_name in children:
+            child_cat, _ = Category.objects.get_or_create(name=child_name, parent=parent_cat)
+            all_categories[child_name] = child_cat
+    
+    print(f"- 已同步 {len(all_categories)} 个图书分类（含二级分类）")
 
     # 3. 创建图书
     book_data = [
-        ('解忧杂货店', '东野圭吾', '9787544270878', '这是一部治愈系的神作。', 10, categories[0]),
-        ('三体', '刘慈欣', '9787229030933', '中国科幻的巅峰之作。', 5, categories[1]),
-        ('人类简史', '尤瓦尔·赫拉利', '9787508647357', '理清人类文明的脉络。', 8, categories[2]),
-        ('设计心理学', '唐纳德·诺曼', '9787508650388', '了解产品设计的核心逻辑。', 3, categories[3]),
-        ('活着', '余华', '9787506365437', '平凡生命在苦难中的坚守。', 12, categories[0]),
-        ('百年孤独', '加西亚·马尔克斯', '9787544253994', '魔幻现实主义的巅峰。', 0, categories[0]), # 无库存演示
+        ('解忧杂货店', '东野圭吾', '9787544270878', '这是一部治愈系的神作。', 10, all_categories['外国文学']),
+        ('三体', '刘慈欣', '9787229030933', '中国科幻的巅峰之作。', 5, all_categories['计算机科学']),
+        ('人类简史', '尤瓦尔·赫拉利', '9787508647357', '理清人类文明的脉络。', 8, all_categories['世界历史']),
+        ('设计心理学', '唐纳德·诺曼', '9787508650388', '了解产品设计的核心逻辑。', 3, all_categories['设计艺术']),
+        ('活着', '余华', '9787506365437', '平凡生命在苦难中的坚守。', 12, all_categories['经典文学']),
+        ('百年孤独', '加西亚·马尔克斯', '9787544253994', '魔幻现实主义的巅峰。', 0, all_categories['外国文学']),
     ]
     
     for title, author, isbn, desc, stock, cat in book_data:

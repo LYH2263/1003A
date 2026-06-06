@@ -123,6 +123,155 @@
         </div>
     </div>
 
+    <!-- Category Management -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center">
+                <i class="fas fa-folder-tree mr-3 text-indigo-500"></i> 分类管理
+            </h3>
+            <button onclick="openAddCategoryModal()" class="px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-opacity-90 transition-all shadow-lg shadow-indigo-100">
+                <i class="fas fa-plus mr-1"></i> 新增顶级分类
+            </button>
+        </div>
+        <div class="p-6">
+            {% if top_categories %}
+            <div class="space-y-2">
+                {% for top_cat in top_categories %}
+                <div class="border border-slate-200 rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between p-4 bg-slate-50/50">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-folder text-amber-500"></i>
+                            <span class="font-bold text-slate-800">{{ top_cat.name }}</span>
+                            <span class="text-xs text-slate-400">({{ top_cat.get_book_count }}本)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openAddCategoryModal('{{ top_cat.id }}', '{{ top_cat.name }}')" class="px-2 py-1 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors">
+                                <i class="fas fa-plus"></i> 子分类
+                            </button>
+                            <button onclick="editCategory('{{ top_cat.id }}', '{{ top_cat.name }}')" class="px-2 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                <i class="fas fa-edit"></i> 编辑
+                            </button>
+                            {% if top_cat.can_delete %}
+                            <form method="post" class="inline" onsubmit="return confirm('确定要删除此分类吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_category">
+                                <input type="hidden" name="category_id" value="{{ top_cat.id }}">
+                                <button type="submit" class="px-2 py-1 text-xs font-bold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                                    <i class="fas fa-trash"></i> 删除
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-bold text-slate-400 bg-slate-100 rounded-lg cursor-not-allowed" title="该分类下有子分类或图书，无法删除">
+                                <i class="fas fa-trash"></i> 删除
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if top_cat.children.all %}
+                    <div class="divide-y divide-slate-100">
+                        {% for child in top_cat.children.all %}
+                        <div class="flex items-center justify-between p-4 pl-12 hover:bg-slate-50 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-folder-open text-slate-400"></i>
+                                <span class="text-slate-700">{{ child.name }}</span>
+                                <span class="text-xs text-slate-400">({{ child.book_set.count }}本)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="editCategory('{{ child.id }}', '{{ child.name }}')" class="px-2 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                    <i class="fas fa-edit"></i> 编辑
+                                </button>
+                                {% if child.can_delete %}
+                                <form method="post" class="inline" onsubmit="return confirm('确定要删除此分类吗？');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_category">
+                                    <input type="hidden" name="category_id" value="{{ child.id }}">
+                                    <button type="submit" class="px-2 py-1 text-xs font-bold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                                        <i class="fas fa-trash"></i> 删除
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="px-2 py-1 text-xs font-bold text-slate-400 bg-slate-100 rounded-lg cursor-not-allowed" title="该分类下有图书，无法删除">
+                                    <i class="fas fa-trash"></i> 删除
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-slate-400">
+                <i class="fas fa-folder-open text-4xl mb-3"></i>
+                <p>暂无分类，点击上方按钮创建第一个顶级分类</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Add/Edit Category Modal -->
+    <div id="categoryModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-slate-800 mb-4" id="categoryModalTitle">新增分类</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" id="categoryAction" value="create_category">
+                <input type="hidden" name="parent_id" id="categoryParentId">
+                <input type="hidden" name="category_id" id="categoryId">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">分类名称</label>
+                        <input type="text" name="name" id="categoryName" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-slate-700">
+                    </div>
+                    <div id="parentCategoryInfo" class="hidden">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">父级分类</label>
+                        <div class="px-4 py-3 bg-slate-100 rounded-xl text-slate-600 text-sm" id="parentCategoryName"></div>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeCategoryModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors">取消</button>
+                    <button type="submit" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 transition-all">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function openAddCategoryModal(parentId, parentName) {
+        document.getElementById('categoryModalTitle').innerText = parentId ? '新增子分类' : '新增顶级分类';
+        document.getElementById('categoryAction').value = 'create_category';
+        document.getElementById('categoryId').value = '';
+        document.getElementById('categoryName').value = '';
+        document.getElementById('categoryParentId').value = parentId || '';
+        if (parentId) {
+            document.getElementById('parentCategoryInfo').classList.remove('hidden');
+            document.getElementById('parentCategoryName').innerText = parentName;
+        } else {
+            document.getElementById('parentCategoryInfo').classList.add('hidden');
+        }
+        document.getElementById('categoryModal').classList.remove('hidden');
+        document.getElementById('categoryModal').classList.add('flex');
+    }
+
+    function editCategory(id, name) {
+        document.getElementById('categoryModalTitle').innerText = '编辑分类';
+        document.getElementById('categoryAction').value = 'edit_category';
+        document.getElementById('categoryId').value = id;
+        document.getElementById('categoryName').value = name;
+        document.getElementById('categoryParentId').value = '';
+        document.getElementById('parentCategoryInfo').classList.add('hidden');
+        document.getElementById('categoryModal').classList.remove('hidden');
+        document.getElementById('categoryModal').classList.add('flex');
+    }
+
+    function closeCategoryModal() {
+        document.getElementById('categoryModal').classList.add('hidden');
+        document.getElementById('categoryModal').classList.remove('flex');
+    }
+    </script>
+
     <!-- Borrow Rules List -->
     <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="p-6 border-b border-slate-100 bg-slate-50/50">

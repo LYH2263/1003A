@@ -5,13 +5,33 @@ import json
 
 class Category(models.Model):
     name = models.CharField(max_length=50, verbose_name="分类名称")
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', verbose_name="父级分类")
     
     def __str__(self):
         return self.name
+    
+    def is_top_level(self):
+        return self.parent is None
+    
+    def get_full_name(self):
+        if self.parent:
+            return f"{self.parent.name}/{self.name}"
+        return self.name
+    
+    def get_book_count(self):
+        if self.is_top_level():
+            return Book.objects.filter(category__parent=self).count()
+        return self.book_set.count()
+    
+    def can_delete(self):
+        if self.is_top_level():
+            return not self.children.exists() and not Book.objects.filter(category__parent=self).exists()
+        return not self.book_set.exists()
         
     class Meta:
         verbose_name = "图书分类"
         verbose_name_plural = verbose_name
+        ordering = ['id']
 
 class Book(models.Model):
     title = models.CharField(max_length=100, verbose_name="书名")
