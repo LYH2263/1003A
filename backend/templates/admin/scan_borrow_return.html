@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% block title %}扫码借还 - 龙猫图书{% endblock %}
+{% block page_title %}扫码借还{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-8">
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
+                <i class="fas fa-barcode text-3xl text-white"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">扫码借还管理</h2>
+            <p class="text-slate-500">扫描图书ISBN条形码，快速查询和办理借还</p>
+        </div>
+        
+        <div class="max-w-2xl mx-auto">
+            <div class="relative">
+                <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                <input 
+                    type="text" 
+                    id="isbnInput" 
+                    placeholder="请扫描或输入ISBN..." 
+                    class="w-full pl-14 pr-32 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-lg font-mono"
+                    autocomplete="off"
+                >
+                <button 
+                    onclick="lookupBook()" 
+                    class="absolute right-2 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all shadow-lg shadow-indigo-200"
+                >
+                    <i class="fas fa-search mr-1"></i> 查询
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mt-3 text-center">
+                <i class="fas fa-lightbulb mr-1"></i> 
+                提示：扫码枪通常会自动回车，请将光标放在输入框后直接扫描
+            </p>
+        </div>
+    </div>
+    
+    <div id="bookInfoContainer" class="hidden">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-8">
+                <div class="flex flex-col md:flex-row gap-8">
+                    <div class="w-full md:w-48 shrink-0">
+                        <div class="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg shadow-slate-100 bg-slate-50">
+                            <img id="bookCover" src="" alt="封面" class="w-full h-full object-cover hidden">
+                            <div id="bookCoverPlaceholder" class="w-full h-full flex items-center justify-center text-slate-300">
+                                <i class="fas fa-book text-5xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <div class="mb-4">
+                            <span id="bookCategory" class="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-lg"></span>
+                        </div>
+                        <h3 id="bookTitle" class="text-2xl font-extrabold text-slate-800 mb-2"></h3>
+                        <p id="bookAuthor" class="text-slate-500 mb-4"></p>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-slate-50 p-4 rounded-xl">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ISBN</p>
+                                <p id="bookIsbn" class="font-mono text-sm text-slate-700"></p>
+                            </div>
+                            <div class="bg-slate-50 p-4 rounded-xl">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">库存</p>
+                                <p id="bookStock" class="text-sm font-bold text-slate-700"></p>
+                            </div>
+                        </div>
+                        
+                        <div id="barcodeSection" class="mb-6">
+                            <div class="bg-slate-50 rounded-xl p-4 text-center">
+                                <img id="bookBarcode" src="" alt="条形码" class="mx-auto max-w-full h-auto">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="loanStatusSection" class="border-t border-slate-100">
+            </div>
+        </div>
+    </div>
+    
+    <div id="noResultContainer" class="hidden">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
+            <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-3xl text-amber-500"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">未找到图书</h3>
+            <p id="noResultMessage" class="text-slate-500">请检查ISBN是否正确</p>
+        </div>
+    </div>
+    
+    <div id="initialHint" class="text-center py-8">
+        <div class="text-slate-300 mb-4">
+            <i class="fas fa-hand-pointer text-5xl"></i>
+        </div>
+        <p class="text-slate-400">请在上方输入框中输入或扫描ISBN开始查询</p>
+    </div>
+</div>
+
+<script>
+    let currentLoanId = null;
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    function lookupBook() {
+        const isbn = document.getElementById('isbnInput').value.trim();
+        if (!isbn) {
+            return;
+        }
+        
+        document.getElementById('initialHint').classList.add('hidden');
+        document.getElementById('bookInfoContainer').classList.add('hidden');
+        document.getElementById('noResultContainer').classList.add('hidden');
+        
+        const loadingHtml = `
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
+                <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+                <p class="text-slate-500">正在查询图书信息...</p>
+            </div>
+        `;
+        
+        if (!document.getElementById('loadingContainer')) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loadingContainer';
+            loadingDiv.innerHTML = loadingHtml;
+            document.querySelector('.max-w-4xl.mx-auto').appendChild(loadingDiv);
+        } else {
+            document.getElementById('loadingContainer').classList.remove('hidden');
+        }
+        
+        fetch(`/scan/lookup/?isbn=${encodeURIComponent(isbn)}`)
+            .then(response => response.json())
+            .then(data => {
+                const loadingContainer = document.getElementById('loadingContainer');
+                if (loadingContainer) {
+                    loadingContainer.classList.add('hidden');
+                }
+                
+                if (data.success) {
+                    displayBookInfo(data.book, data.active_loan);
+                } else {
+                    displayNoResult(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const loadingContainer = document.getElementById('loadingContainer');
+                if (loadingContainer) {
+                    loadingContainer.classList.add('hidden');
+                }
+                displayNoResult('查询失败，请稍后重试');
+            });
+    }
+    
+    function displayBookInfo(book, activeLoan) {
+        document.getElementById('bookInfoContainer').classList.remove('hidden');
+        
+        document.getElementById('bookTitle').textContent = book.title;
+        document.getElementById('bookAuthor').textContent = '作者: ' + book.author;
+        document.getElementById('bookIsbn').textContent = book.isbn;
+        document.getElementById('bookStock').textContent = book.stock + ' / ' + book.total_stock + ' 本';
+        document.getElementById('bookCategory').textContent = book.category_name || '未分类';
+        
+        if (book.cover_url) {
+            document.getElementById('bookCover').src = book.cover_url;
+            document.getElementById('bookCover').classList.remove('hidden');
+            document.getElementById('bookCoverPlaceholder').classList.add('hidden');
+        } else {
+            document.getElementById('bookCover').classList.add('hidden');
+            document.getElementById('bookCoverPlaceholder').classList.remove('hidden');
+        }
+        
+        if (book.barcode_url) {
+            document.getElementById('bookBarcode').src = book.barcode_url;
+            document.getElementById('barcodeSection').classList.remove('hidden');
+        } else {
+            document.getElementById('barcodeSection').classList.add('hidden');
+        }
+        
+        const loanStatusSection = document.getElementById('loanStatusSection');
+        currentLoanId = activeLoan ? activeLoan.id : null;
+        
+        if (activeLoan) {
+            const isOverdue = activeLoan.is_overdue;
+            const statusBg = isOverdue ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100';
+            const statusText = isOverdue ? 'text-red-600' : 'text-emerald-600';
+            const statusIcon = isOverdue ? 'fa-exclamation-circle' : 'fa-book-open';
+            const statusLabel = isOverdue ? '已逾期' : '借阅中';
+            
+            loanStatusSection.innerHTML = `
+                <div class="p-8 ${statusBg} border-t">
+                    <div class="flex items-center mb-6">
+                        <i class="fas ${statusIcon} text-2xl ${statusText} mr-3"></i>
+                        <h4 class="text-lg font-bold ${statusText}">该书当前${statusLabel}</h4>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+                        <h5 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-user-circle text-primary mr-2"></i>
+                            借阅人信息
+                        </h5>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">用户名</p>
+                                <p class="text-slate-700 font-medium">${activeLoan.user.username}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">邮箱</p>
+                                <p class="text-slate-700">${activeLoan.user.email || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">借阅日期</p>
+                                <p class="text-slate-700">${activeLoan.borrow_date}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">应还日期</p>
+                                <p class="text-slate-700 ${isOverdue ? 'text-red-500 font-bold' : ''}">${activeLoan.due_date}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="returnBook()" class="w-full py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center">
+                        <i class="fas fa-undo mr-2"></i> 一键归还
+                    </button>
+                </div>
+            `;
+        } else {
+            loanStatusSection.innerHTML = `
+                <div class="p-8 bg-slate-50 border-t">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-check-circle text-2xl text-emerald-500 mr-3"></i>
+                        <h4 class="text-lg font-bold text-emerald-600">该书在馆，可借出</h4>
+                    </div>
+                    <p class="text-slate-500 text-sm">当前库存充足，读者可正常借阅。</p>
+                </div>
+            `;
+        }
+    }
+    
+    function displayNoResult(message) {
+        document.getElementById('noResultContainer').classList.remove('hidden');
+        document.getElementById('noResultMessage').textContent = message || '请检查ISBN是否正确';
+    }
+    
+    function returnBook() {
+        if (!currentLoanId) {
+            return;
+        }
+        
+        if (!confirm('确定要归还这本书吗？')) {
+            return;
+        }
+        
+        fetch(`/scan/return/${currentLoanId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let message = '归还成功！';
+                if (data.points > 0) {
+                    message += ` 信用分+${data.points}分`;
+                } else if (data.points < 0) {
+                    message += ` 信用分${data.points}分`;
+                }
+                if (data.fine_amount > 0) {
+                    message += `，逾期罚款¥${data.fine_amount.toFixed(2)}`;
+                }
+                
+                alert(message);
+                
+                const isbn = document.getElementById('isbnInput').value.trim();
+                if (isbn) {
+                    lookupBook();
+                }
+            } else {
+                alert('归还失败：' + (data.message || '未知错误'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('归还失败，请稍后重试');
+        });
+    }
+    
+    document.getElementById('isbnInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            lookupBook();
+        }
+    });
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('isbnInput').focus();
+    });
+</script>
+{% endblock %}

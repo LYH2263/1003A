@@ -64,6 +64,10 @@
                         <i class="fas fa-exchange-alt w-6"></i>
                         <span>借阅审核</span>
                     </a>
+                    <a href="{% url 'scan_borrow_return' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'scan_borrow_return' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
+                        <i class="fas fa-barcode w-6"></i>
+                        <span>扫码借还</span>
+                    </a>
                     <a href="{% url 'review_manage' %}" class="flex items-center px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors {% if request.resolver_match.url_name == 'review_manage' %}bg-primary text-white{% else %}text-slate-400{% endif %}">
                         <i class="fas fa-comments w-6"></i>
                         <span>评论管理</span>

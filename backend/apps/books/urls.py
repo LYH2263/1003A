@@ -59,4 +59,14 @@ urlpatterns = [
     path('books/<int:pk>/remove-from-all-lists/', views.remove_from_all_lists, name='remove_from_all_lists'),
     path('book-lists/<int:pk>/share/', views.book_list_share, name='book_list_share'),
     path('shared-list/<str:token>/', views.shared_book_list, name='shared_book_list'),
+    
+    # Barcode System
+    path('books/<int:pk>/barcode/', views.book_barcode, name='book_barcode'),
+    path('books/<int:pk>/barcode/download/', views.book_barcode_download, name='book_barcode_download'),
+    path('books/batch-barcode/', views.batch_barcode_generate, name='batch_barcode_generate'),
+    
+    # Scan Borrow & Return
+    path('scan/', views.scan_borrow_return, name='scan_borrow_return'),
+    path('scan/lookup/', views.scan_lookup, name='scan_lookup'),
+    path('scan/return/<int:loan_id>/', views.scan_return_book, name='scan_return_book'),
 ]

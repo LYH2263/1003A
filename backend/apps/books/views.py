@@ -131,7 +131,7 @@ def book_create(request):
             messages.error(request, "ISBN 已存在，请检查输入。")
         else:
             category = Category.objects.get(pk=category_id) if category_id else None
-            Book.objects.create(
+            book = Book.objects.create(
                 title=title,
                 author=author,
                 isbn=isbn,
@@ -141,6 +141,8 @@ def book_create(request):
                 total_stock=total_stock,
                 cover=cover
             )
+            from .utils import ensure_barcode_exists
+            ensure_barcode_exists(book)
             messages.success(request, f"图书《{title}》已成功上架。")
     
     return redirect('book_manage')
@@ -152,6 +154,7 @@ def book_edit(request, pk):
         
     book = get_object_or_404(Book, pk=pk)
     old_stock = book.stock
+    old_isbn = book.isbn
     
     if request.method == 'POST':
         book.title = request.POST.get('title')
@@ -177,6 +180,15 @@ def book_edit(request, pk):
             book.cover = request.FILES.get('cover')
             
         book.save()
+        
+        from .utils import ensure_barcode_exists, get_barcode_dir, normalize_isbn
+        if new_isbn != old_isbn:
+            old_normalized = normalize_isbn(old_isbn)
+            if old_normalized:
+                old_file = get_barcode_dir() / f"{old_normalized}.png"
+                if old_file.exists():
+                    old_file.unlink()
+        ensure_barcode_exists(book)
         
         # If stock was 0 and now > 0, notify waiting readers
         if old_stock == 0 and book.stock > 0:
@@ -298,6 +310,9 @@ def book_detail(request, pk):
     active_rule = BorrowRule.get_active_rule()
     borrow_rule_summary = active_rule.get_rule_summary() if active_rule else "借期30天，可续借1次"
     
+    from .utils import ensure_barcode_exists
+    barcode_url = ensure_barcode_exists(book)
+    
     if request.user.is_authenticated:
         user_reservation = Reservation.objects.filter(
             user=request.user,
@@ -313,7 +328,8 @@ def book_detail(request, pk):
         'reviews': reviews,
         'can_review': can_review,
         'has_reviewed': has_reviewed,
-        'borrow_rule_summary': borrow_rule_summary
+        'borrow_rule_summary': borrow_rule_summary,
+        'barcode_url': barcode_url
     })
 
 @login_required
@@ -1554,3 +1570,207 @@ def dashboard_export_excel(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
+
+
+@login_required
+def book_barcode(request, pk):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    book = get_object_or_404(Book, pk=pk)
+    from .utils import ensure_barcode_exists
+    
+    barcode_url = ensure_barcode_exists(book)
+    
+    return JsonResponse({
+        'success': True,
+        'book_id': book.id,
+        'book_title': book.title,
+        'isbn': book.isbn,
+        'barcode_url': barcode_url
+    })
+
+
+@login_required
+def book_barcode_download(request, pk):
+    if request.user.role != 'admin':
+        return redirect('home')
+    
+    book = get_object_or_404(Book, pk=pk)
+    from .utils import generate_barcode_image, normalize_isbn
+    
+    filepath, url = generate_barcode_image(book.isbn)
+    
+    from django.http import FileResponse
+    import os
+    
+    filename = f"{book.title}_{book.isbn}.png"
+    response = FileResponse(open(filepath, 'rb'), content_type='image/png')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@require_POST
+def batch_barcode_generate(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    book_ids = request.POST.getlist('book_ids')
+    if not book_ids:
+        messages.error(request, "请先选择要生成条码的图书。")
+        return redirect('book_manage')
+    
+    books = Book.objects.filter(id__in=book_ids)
+    if not books.exists():
+        messages.error(request, "未找到选中的图书。")
+        return redirect('book_manage')
+    
+    from .utils import generate_barcode_image
+    import zipfile
+    from io import BytesIO
+    from django.http import HttpResponse
+    
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for book in books:
+            if book.isbn:
+                filepath, url = generate_barcode_image(book.isbn)
+                filename = f"{book.title}_{book.isbn}.png"
+                filename = filename.replace('/', '_').replace('\\', '_')
+                zip_file.write(filepath, arcname=filename)
+    
+    zip_buffer.seek(0)
+    
+    from datetime import datetime
+    zip_filename = f"图书条码批量生成_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    
+    response = HttpResponse(
+        zip_buffer.getvalue(),
+        content_type='application/zip'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{zip_filename}"'
+    return response
+
+
+@login_required
+def scan_borrow_return(request):
+    if request.user.role != 'admin':
+        return redirect('home')
+    
+    return render(request, 'admin/scan_borrow_return.html')
+
+
+@login_required
+def scan_lookup(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    isbn = request.GET.get('isbn', '').strip()
+    if not isbn:
+        return JsonResponse({'success': False, 'message': '请输入ISBN'})
+    
+    from .utils import normalize_isbn
+    normalized_isbn = normalize_isbn(isbn)
+    
+    book = Book.objects.filter(isbn=isbn).first()
+    if not book:
+        book = Book.objects.filter(isbn=normalized_isbn).first()
+    
+    if not book:
+        return JsonResponse({'success': False, 'message': '未找到该ISBN对应的图书'})
+    
+    active_loan = LoanRecord.objects.filter(
+        book=book,
+        status='borrowed'
+    ).select_related('user').first()
+    
+    from .utils import ensure_barcode_exists
+    barcode_url = ensure_barcode_exists(book)
+    
+    book_data = {
+        'id': book.id,
+        'title': book.title,
+        'author': book.author,
+        'isbn': book.isbn,
+        'stock': book.stock,
+        'total_stock': book.total_stock,
+        'cover_url': book.cover.url if book.cover else None,
+        'barcode_url': barcode_url,
+        'category_name': book.category.get_full_name() if book.category else '未分类',
+    }
+    
+    if active_loan:
+        loan_data = {
+            'id': active_loan.id,
+            'borrow_date': active_loan.borrow_date.strftime('%Y-%m-%d'),
+            'due_date': active_loan.due_date.strftime('%Y-%m-%d'),
+            'is_overdue': active_loan.is_overdue(),
+            'user': {
+                'id': active_loan.user.id,
+                'username': active_loan.user.username,
+                'email': active_loan.user.email,
+            }
+        }
+    else:
+        loan_data = None
+    
+    return JsonResponse({
+        'success': True,
+        'book': book_data,
+        'active_loan': loan_data
+    })
+
+
+@login_required
+@require_POST
+def scan_return_book(request, loan_id):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    loan = get_object_or_404(LoanRecord, pk=loan_id, status='borrowed')
+    
+    loan.return_date = date.today()
+    loan.book.stock += 1
+    loan.book.save()
+    
+    days_diff = (loan.due_date - loan.return_date).days
+    if days_diff >= 7:
+        points = 3
+        log_type = 'return_early'
+        reason = f'提前归还《{loan.book.title}》，提前{days_diff}天'
+        loan.status = 'returned'
+        loan.fine_paid = True
+    elif days_diff >= 0:
+        points = 1
+        log_type = 'return_on_time'
+        reason = f'按时归还《{loan.book.title}》'
+        loan.status = 'returned'
+        loan.fine_paid = True
+    else:
+        late_days = abs(days_diff)
+        points = -(late_days * 2)
+        log_type = 'return_late'
+        reason = f'逾期归还《{loan.book.title}》，逾期{late_days}天'
+        fine_amount = late_days * float(loan.fine_daily_rate)
+        loan.fine_amount = fine_amount
+        loan.status = 'pending_payment'
+        loan.fine_paid = False
+    
+    loan.save()
+    
+    loan.user.update_credit(points, reason, request.user)
+    from apps.users.models import CreditLog
+    CreditLog.objects.filter(user=loan.user, reason=reason).update(log_type=log_type)
+    
+    Reservation.notify_next_reader(loan.book)
+    
+    return JsonResponse({
+        'success': True,
+        'status': loan.status,
+        'points': points,
+        'reason': reason,
+        'fine_amount': float(loan.fine_amount) if loan.fine_amount else 0,
+        'message': '归还成功'
+    })

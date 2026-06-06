@@ -17,6 +17,16 @@
                 {% endif %}
                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
             </div>
+            
+            {% if barcode_url %}
+            <div class="mt-6 bg-white rounded-2xl shadow-lg shadow-slate-100 border border-slate-100 p-6 text-center">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">图书条形码</p>
+                <div class="bg-slate-50 rounded-xl p-4 mb-3">
+                    <img src="{{ barcode_url }}" alt="图书条形码" class="mx-auto max-w-full h-auto">
+                </div>
+                <p class="font-mono text-sm text-slate-600">ISBN: {{ book.isbn }}</p>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Right: Info -->

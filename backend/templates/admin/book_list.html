@@ -11,9 +11,14 @@
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
             <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="搜索书名、作者、ISBN..." class="w-full pl-11 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm">
         </form>
-        <button onclick="openBookModal()" class="w-full md:w-auto px-6 py-2 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all flex items-center justify-center shadow-lg shadow-indigo-100">
-            <i class="fas fa-plus mr-2"></i> 上架新书
-        </button>
+        <div class="flex flex-wrap gap-3">
+            <button onclick="batchGenerateBarcode()" class="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all flex items-center justify-center shadow-lg shadow-emerald-100">
+                <i class="fas fa-barcode mr-2"></i> 批量生成条码
+            </button>
+            <button onclick="openBookModal()" class="px-6 py-2 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all flex items-center justify-center shadow-lg shadow-indigo-100">
+                <i class="fas fa-plus mr-2"></i> 上架新书
+            </button>
+        </div>
     </div>
 
     <!-- Table -->
@@ -21,6 +26,9 @@
         <table class="w-full text-left border-collapse">
             <thead class="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
                 <tr>
+                    <th class="px-4 py-4 w-12">
+                        <input type="checkbox" id="select-all" onchange="toggleSelectAll()" class="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary">
+                    </th>
                     <th class="px-6 py-4">封面</th>
                     <th class="px-6 py-4">书名 / 作者</th>
                     <th class="px-6 py-4">ISBN</th>
@@ -31,6 +39,9 @@
             <tbody class="divide-y divide-slate-100">
                 {% for book in books %}
                 <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-4 py-4">
+                        <input type="checkbox" class="book-checkbox w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary" value="{{ book.pk }}" onchange="updateBatchButtonState()">
+                    </td>
                     <td class="px-6 py-4">
                         <div class="w-12 h-16 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center text-slate-400">
                             {% if book.cover %}
@@ -62,7 +73,10 @@
                         </div>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 text-center space-x-2">
+                    <td class="px-6 py-4 text-center space-x-1">
+                        <button onclick="showBarcode({{ book.pk }})" class="p-2 text-slate-400 hover:text-emerald-500 transition-colors inline-block" title="查看条码">
+                            <i class="fas fa-barcode"></i>
+                        </button>
                         <a href="{% url 'reservation_queue' book.pk %}" class="p-2 text-slate-400 hover:text-amber-500 transition-colors inline-block" title="查看预约队列">
                             <i class="fas fa-list"></i>
                         </a>
@@ -79,7 +93,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="px-6 py-10 text-center text-slate-400 text-sm">暂无图书数据</td>
+                    <td colspan="7" class="px-6 py-10 text-center text-slate-400 text-sm">暂无图书数据</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -178,6 +192,45 @@
     </div>
 </div>
 
+<!-- Barcode Modal -->
+<div id="barcodeModal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 transform scale-95 transition-transform duration-300" id="barcodeModalContent">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-slate-800" id="barcodeModalTitle">图书条形码</h3>
+            <button onclick="closeBarcodeModal()" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div id="barcodeLoading" class="py-12 text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+            <p class="text-slate-500">正在生成条形码...</p>
+        </div>
+        
+        <div id="barcodeContent" class="hidden">
+            <div class="bg-white border border-slate-200 rounded-2xl p-8 text-center mb-6">
+                <img id="barcodeImage" src="" alt="条形码" class="mx-auto max-w-full h-auto">
+                <p id="barcodeIsbn" class="mt-4 font-mono text-sm text-slate-600"></p>
+                <p id="barcodeBookTitle" class="mt-2 text-sm font-bold text-slate-800"></p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="printBarcode()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center">
+                    <i class="fas fa-print mr-2"></i> 打印
+                </button>
+                <button id="downloadBarcodeBtn" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all flex items-center justify-center shadow-lg shadow-indigo-200">
+                    <i class="fas fa-download mr-2"></i> 下载 PNG
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Barcode Form (hidden) -->
+<form id="batchBarcodeForm" method="post" action="{% url 'batch_barcode_generate' %}" style="display:none;">
+    {% csrf_token %}
+</form>
+
 <script>
     function openBookModal(pk, title, author, isbn, categoryId, totalStock, description) {
         const modal = document.getElementById('bookModal');
@@ -221,6 +274,160 @@
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
+    }
+
+    let currentBookId = null;
+
+    function showBarcode(bookId) {
+        currentBookId = bookId;
+        const modal = document.getElementById('barcodeModal');
+        const modalContent = document.getElementById('barcodeModalContent');
+        const loading = document.getElementById('barcodeLoading');
+        const content = document.getElementById('barcodeContent');
+        
+        loading.classList.remove('hidden');
+        content.classList.add('hidden');
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+            modalContent.classList.add('scale-100');
+        }, 10);
+        
+        fetch(`/books/${bookId}/barcode/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('barcodeImage').src = data.barcode_url;
+                    document.getElementById('barcodeIsbn').textContent = 'ISBN: ' + data.isbn;
+                    document.getElementById('barcodeBookTitle').textContent = data.book_title;
+                    document.getElementById('downloadBarcodeBtn').onclick = function() {
+                        window.location.href = `/books/${bookId}/barcode/download/`;
+                    };
+                    
+                    loading.classList.add('hidden');
+                    content.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                loading.innerHTML = '<i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i><p class="text-red-500">生成条形码失败</p>';
+            });
+    }
+
+    function closeBarcodeModal() {
+        const modal = document.getElementById('barcodeModal');
+        const modalContent = document.getElementById('barcodeModalContent');
+        
+        modal.classList.add('opacity-0');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+        
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    function printBarcode() {
+        const printWindow = window.open('', '_blank');
+        const barcodeImg = document.getElementById('barcodeImage').src;
+        const isbn = document.getElementById('barcodeIsbn').textContent;
+        const title = document.getElementById('barcodeBookTitle').textContent;
+        
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>打印条形码</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        text-align: center;
+                        padding: 40px;
+                    }
+                    .barcode-container {
+                        display: inline-block;
+                        padding: 30px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                    }
+                    img {
+                        max-width: 100%;
+                        height: auto;
+                    }
+                    .isbn {
+                        font-family: monospace;
+                        font-size: 14px;
+                        margin-top: 15px;
+                        color: #333;
+                    }
+                    .title {
+                        font-size: 16px;
+                        font-weight: bold;
+                        margin-top: 8px;
+                        color: #333;
+                    }
+                    @media print {
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="barcode-container">
+                    <img src="${barcodeImg}" alt="条形码">
+                    <div class="isbn">${isbn}</div>
+                    <div class="title">${title}</div>
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    };
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('select-all');
+        const checkboxes = document.querySelectorAll('.book-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+        updateBatchButtonState();
+    }
+
+    function updateBatchButtonState() {
+        const checkboxes = document.querySelectorAll('.book-checkbox:checked');
+        const selectAll = document.getElementById('select-all');
+        const totalCheckboxes = document.querySelectorAll('.book-checkbox').length;
+        selectAll.checked = totalCheckboxes > 0 && checkboxes.length === totalCheckboxes;
+        selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < totalCheckboxes;
+    }
+
+    function batchGenerateBarcode() {
+        const checkboxes = document.querySelectorAll('.book-checkbox:checked');
+        if (checkboxes.length === 0) {
+            uiAlert('提示', '请先选择要生成条码的图书。');
+            return;
+        }
+        
+        const form = document.getElementById('batchBarcodeForm');
+        
+        const existingInputs = form.querySelectorAll('input[name="book_ids"]');
+        existingInputs.forEach(input => input.remove());
+        
+        checkboxes.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'book_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        
+        form.submit();
     }
 </script>
 {% endblock %}
