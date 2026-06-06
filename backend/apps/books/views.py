@@ -1681,10 +1681,10 @@ def scan_lookup(request):
     if not book:
         return JsonResponse({'success': False, 'message': '未找到该ISBN对应的图书'})
     
-    active_loan = LoanRecord.objects.filter(
+    active_loans = LoanRecord.objects.filter(
         book=book,
         status='borrowed'
-    ).select_related('user').first()
+    ).select_related('user').order_by('borrow_date')
     
     from .utils import ensure_barcode_exists
     barcode_url = ensure_barcode_exists(book)
@@ -1699,27 +1699,27 @@ def scan_lookup(request):
         'cover_url': book.cover.url if book.cover else None,
         'barcode_url': barcode_url,
         'category_name': book.category.get_full_name() if book.category else '未分类',
+        'borrowed_count': active_loans.count(),
     }
     
-    if active_loan:
-        loan_data = {
-            'id': active_loan.id,
-            'borrow_date': active_loan.borrow_date.strftime('%Y-%m-%d'),
-            'due_date': active_loan.due_date.strftime('%Y-%m-%d'),
-            'is_overdue': active_loan.is_overdue(),
+    loans_data = []
+    for loan in active_loans:
+        loans_data.append({
+            'id': loan.id,
+            'borrow_date': loan.borrow_date.strftime('%Y-%m-%d'),
+            'due_date': loan.due_date.strftime('%Y-%m-%d'),
+            'is_overdue': loan.is_overdue(),
             'user': {
-                'id': active_loan.user.id,
-                'username': active_loan.user.username,
-                'email': active_loan.user.email,
+                'id': loan.user.id,
+                'username': loan.user.username,
+                'email': loan.user.email,
             }
-        }
-    else:
-        loan_data = None
+        })
     
     return JsonResponse({
         'success': True,
         'book': book_data,
-        'active_loan': loan_data
+        'active_loans': loans_data
     })
 
 

@@ -101,8 +101,6 @@
 </div>
 
 <script>
-    let currentLoanId = null;
-    
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -153,7 +151,7 @@
                 }
                 
                 if (data.success) {
-                    displayBookInfo(data.book, data.active_loan);
+                    displayBookInfo(data.book, data.active_loans);
                 } else {
                     displayNoResult(data.message);
                 }
@@ -168,7 +166,7 @@
             });
     }
     
-    function displayBookInfo(book, activeLoan) {
+    function displayBookInfo(book, activeLoans) {
         document.getElementById('bookInfoContainer').classList.remove('hidden');
         
         document.getElementById('bookTitle').textContent = book.title;
@@ -194,50 +192,69 @@
         }
         
         const loanStatusSection = document.getElementById('loanStatusSection');
-        currentLoanId = activeLoan ? activeLoan.id : null;
         
-        if (activeLoan) {
-            const isOverdue = activeLoan.is_overdue;
-            const statusBg = isOverdue ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100';
-            const statusText = isOverdue ? 'text-red-600' : 'text-emerald-600';
-            const statusIcon = isOverdue ? 'fa-exclamation-circle' : 'fa-book-open';
-            const statusLabel = isOverdue ? '已逾期' : '借阅中';
+        if (activeLoans && activeLoans.length > 0) {
+            const hasOverdue = activeLoans.some(loan => loan.is_overdue);
+            const statusBg = hasOverdue ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100';
+            const statusText = hasOverdue ? 'text-red-600' : 'text-emerald-600';
+            const statusIcon = hasOverdue ? 'fa-exclamation-circle' : 'fa-book-open';
+            const statusLabel = hasOverdue ? '有逾期借阅' : '借阅中';
+            
+            let loanListHtml = '';
+            activeLoans.forEach((loan, index) => {
+                const isOverdue = loan.is_overdue;
+                const loanBg = isOverdue ? 'bg-red-50/50 border-red-200' : 'bg-white border-slate-200';
+                const dueDateClass = isOverdue ? 'text-red-500 font-bold' : '';
+                const overdueBadge = isOverdue ? '<span class="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded ml-2">已逾期</span>' : '';
+                
+                loanListHtml += `
+                    <div class="p-5 rounded-xl border ${loanBg} mb-4 last:mb-0">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold mr-3">
+                                    ${loan.user.username.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div class="flex items-center">
+                                        <p class="font-bold text-slate-800">${loan.user.username}</p>
+                                        ${overdueBadge}
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5">${loan.user.email || '-'}</p>
+                                </div>
+                            </div>
+                            <button onclick="returnBook(${loan.id})" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-md shadow-emerald-200 flex items-center">
+                                <i class="fas fa-undo mr-1.5"></i> 一键归还
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200/50">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">借阅日期</p>
+                                <p class="text-sm text-slate-700">${loan.borrow_date}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">应还日期</p>
+                                <p class="text-sm ${dueDateClass}">${loan.due_date}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
             
             loanStatusSection.innerHTML = `
                 <div class="p-8 ${statusBg} border-t">
                     <div class="flex items-center mb-6">
                         <i class="fas ${statusIcon} text-2xl ${statusText} mr-3"></i>
-                        <h4 class="text-lg font-bold ${statusText}">该书当前${statusLabel}</h4>
+                        <h4 class="text-lg font-bold ${statusText}">
+                            该书${statusLabel}
+                            <span class="ml-2 px-2.5 py-1 bg-white/60 rounded-lg text-sm font-bold">
+                                ${activeLoans.length} 本借出
+                            </span>
+                        </h4>
                     </div>
                     
-                    <div class="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-                        <h5 class="font-bold text-slate-800 mb-4 flex items-center">
-                            <i class="fas fa-user-circle text-primary mr-2"></i>
-                            借阅人信息
-                        </h5>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">用户名</p>
-                                <p class="text-slate-700 font-medium">${activeLoan.user.username}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">邮箱</p>
-                                <p class="text-slate-700">${activeLoan.user.email || '-'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">借阅日期</p>
-                                <p class="text-slate-700">${activeLoan.borrow_date}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">应还日期</p>
-                                <p class="text-slate-700 ${isOverdue ? 'text-red-500 font-bold' : ''}">${activeLoan.due_date}</p>
-                            </div>
-                        </div>
+                    <div class="space-y-4">
+                        ${loanListHtml}
                     </div>
-                    
-                    <button onclick="returnBook()" class="w-full py-4 bg-emerald-500 text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center">
-                        <i class="fas fa-undo mr-2"></i> 一键归还
-                    </button>
                 </div>
             `;
         } else {
@@ -258,8 +275,8 @@
         document.getElementById('noResultMessage').textContent = message || '请检查ISBN是否正确';
     }
     
-    function returnBook() {
-        if (!currentLoanId) {
+    function returnBook(loanId) {
+        if (!loanId) {
             return;
         }
         
@@ -267,7 +284,7 @@
             return;
         }
         
-        fetch(`/scan/return/${currentLoanId}/`, {
+        fetch(`/scan/return/${loanId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
